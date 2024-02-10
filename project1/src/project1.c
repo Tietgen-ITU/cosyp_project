@@ -3,11 +3,13 @@
 #include "hash.h"
 #include "test_data.h"
 
-int main() {
-    int num_tuples = 10;
-    struct tuple* tuples = generate_tuples(num_tuples, 12);
+#define SEED 1337
+#define NUM_TUPLES 10
 
-    for (int i = 0; i < num_tuples; i++) {
+int main() {
+    struct tuple* tuples = generate_tuples(NUM_TUPLES, SEED);
+
+    for (int i = 0; i < NUM_TUPLES; i++) {
         printf("partitioning_key: %lld, payload: %lld\n", tuples[i].partitioning_key, tuples[i].payload);
     }
 
