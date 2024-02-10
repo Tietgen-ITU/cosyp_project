@@ -1,4 +1,4 @@
-project1: $(wildcard src/*.c)
+project1: $(wildcard src/*)
 	gcc -o project1 src/*.c -Isrc -Wall -g
 
 .PHONY: run
