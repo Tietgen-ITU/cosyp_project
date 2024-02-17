@@ -66,16 +66,18 @@ void *worker(void *arguments)
 
     // TODO: re-evaluate. 4x to minimise probability of exceeding buffer size.
     // Could do wrap-around and overwrite previous entries? But this is wrong.
-    size_t partition_space = expected_size * 4; 
+    size_t partition_space = expected_size * 4;
 
     size_t *partition_lengths = malloc(num_partitions * sizeof(size_t));
     struct tuple **partitions = malloc(num_partitions * sizeof(struct tuple *));
-    for (int i = 0; i < num_partitions; i++) {
+    for (int i = 0; i < num_partitions; i++)
+    {
         partitions[i] = malloc(partition_space * sizeof(struct tuple));
         partition_lengths[i] = 0;
     }
 
-    for (size_t i = 0; i < args.length; i++) {
+    for (size_t i = 0; i < args.length; i++)
+    {
         int64_t partition_index = hash(args.data[i].partitioning_key, args.hash_bits);
         size_t cur_partition_length = partition_lengths[partition_index];
         partitions[partition_index][cur_partition_length] = args.data[i];
