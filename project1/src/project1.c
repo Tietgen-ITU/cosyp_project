@@ -7,7 +7,7 @@
 #include "benchmark.h"
 
 #define SEED 1337
-#define NUM_TUPLES 10
+#define NUM_TUPLES 64
 
 int main() {
     struct tuple* tuples = generate_tuples(NUM_TUPLES, SEED);
@@ -19,7 +19,7 @@ int main() {
     struct partition_options options = {
         .data = tuples,
         .data_length = NUM_TUPLES,
-        .hash_bits = 4,
+        .hash_bits = 2,
         .num_threads = 4
     };
 
