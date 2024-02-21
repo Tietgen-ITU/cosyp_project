@@ -3,4 +3,4 @@ project1: $(wildcard src/*)
 
 .PHONY: run
 run: project1
-	./project1
+	./project1 $(ARGS)
