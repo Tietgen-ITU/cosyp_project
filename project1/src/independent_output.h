@@ -3,9 +3,10 @@
 
 #include <stdio.h>
 #include <pthread.h>
+#include "hash.h"
 #include "partitioning_algorithm.h"
 
-struct worker_args
+struct independent_output_worker_args
 {
     struct tuple *data;
     size_t length;
@@ -13,13 +14,13 @@ struct worker_args
     int hash_bits;
 };
 
-void *worker(void *arguments);
+void *independent_output_worker(void *arguments);
 
 void independent_output(struct partition_options *options)
 {
     pthread_t *threads = malloc(options->num_threads * sizeof(pthread_t));
     pthread_attr_t *attr = malloc(options->num_threads * sizeof(pthread_attr_t));
-    struct worker_args *args = malloc(options->num_threads * sizeof(struct worker_args));
+    struct independent_output_worker_args *args = malloc(options->num_threads * sizeof(struct independent_output_worker_args));
 
     for (int i = 0; i < options->num_threads; i++)
     {
@@ -27,7 +28,7 @@ void independent_output(struct partition_options *options)
         size_t length = options->data_length / options->num_threads;
         struct tuple *data = options->data + (i * length);
 
-        args[i] = (struct worker_args){
+        args[i] = (struct independent_output_worker_args){
             .data = data,
             .length = length,
             .thread_num = i,
@@ -39,7 +40,7 @@ void independent_output(struct partition_options *options)
             goto cleanup;
         }
 
-        if (pthread_create(&threads[i], &attr[i], worker, &args[i]))
+        if (pthread_create(&threads[i], &attr[i], independent_output_worker, &args[i]))
         {
             printf("Error creating thread %d - aborting\n", i);
             goto cleanup;
@@ -58,9 +59,9 @@ cleanup:
     free(args);
 }
 
-void *worker(void *arguments)
+void *independent_output_worker(void *arguments)
 {
-    struct worker_args args = *((struct worker_args *)arguments);
+    struct independent_output_worker_args args = *((struct independent_output_worker_args *)arguments);
     size_t num_partitions = (1 << args.hash_bits);
     size_t expected_size = args.length / num_partitions;
 
