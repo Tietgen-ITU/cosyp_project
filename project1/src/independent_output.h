@@ -3,8 +3,23 @@
 
 #include <stdio.h>
 #include <pthread.h>
+#include <math.h>
 #include "hash.h"
 #include "partitioning_algorithm.h"
+
+#ifdef WITH_CORE_AFFINITY
+
+// Add core affinity dependency
+#include <sched.h>
+#define should_get_neighbour_thread(i) (i % 2)
+
+/*
+Gets the thread id by the given index.
+
+It prioritizes getting thread ids that is on the same core.
+*/
+#define get_thread_id(i) ((should_get_neighbour_thread(i)) ? (15 + (i * 2)) : (i * 2))
+#endif
 
 struct independent_output_worker_args
 {
@@ -21,6 +36,10 @@ void independent_output(struct partition_options *options)
     pthread_t *threads = malloc(options->num_threads * sizeof(pthread_t));
     pthread_attr_t *attr = malloc(options->num_threads * sizeof(pthread_attr_t));
     struct independent_output_worker_args *args = malloc(options->num_threads * sizeof(struct independent_output_worker_args));
+
+#ifdef WITH_CORE_AFFINITY
+    cpu_set_t *cpuset = malloc(options->num_threads * sizeof(cpu_set_t));
+#endif
 
     for (int i = 0; i < options->num_threads; i++)
     {
@@ -40,6 +59,15 @@ void independent_output(struct partition_options *options)
             goto cleanup;
         }
 
+#ifdef WITH_CORE_AFFINITY
+        int thread_id = get_thread_id(i);
+        printf("Setting core affinity for thread %d\n", i);
+        CPU_ZERO(cpuset[i]);           // Reset the cpu set mask
+        CPU_SET(thread_id, cpuset[i]); // Set the cpu mask to point at the thread_id
+
+        pthread_attr_setaffinity_np(&attr[i], sizeof(cpu_set_t), &cpuset[i]);
+#endif
+
         if (pthread_create(&threads[i], &attr[i], independent_output_worker, &args[i]))
         {
             printf("Error creating thread %d - aborting\n", i);
@@ -57,6 +85,9 @@ cleanup:
     free(threads);
     free(attr);
     free(args);
+#ifdef WITH_CORE_AFFINITY
+    free(cpuset);
+#endif
 }
 
 void *independent_output_worker(void *arguments)
