@@ -19,7 +19,7 @@ struct independent_output_worker_args
 
 void *independent_output_worker(void *arguments);
 
-void independent_output(struct partition_options *options)
+void independent_output(struct partition_options *options, void bench_start(), void bench_end())
 {
     pthread_t *threads = (pthread_t *)malloc(options->num_threads * sizeof(pthread_t));
     pthread_attr_t *attr = (pthread_attr_t *)malloc(options->num_threads * sizeof(pthread_attr_t));
@@ -65,6 +65,8 @@ void independent_output(struct partition_options *options)
             .partitions = partitions};
     }
 
+    bench_start();
+
     for (int i = 0; i < options->num_threads; i++)
     {
         if (pthread_attr_init(&attr[i]))
@@ -85,6 +87,8 @@ void independent_output(struct partition_options *options)
         pthread_join(threads[i], NULL);
         pthread_attr_destroy(&attr[i]);
     }
+
+    bench_end();
 
 cleanup:
     for (int i = 0; i < num_allocated_partitions; i++)

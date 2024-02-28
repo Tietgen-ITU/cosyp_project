@@ -13,6 +13,6 @@ struct partition_options {
     int num_threads;
 };
 
-typedef void (*partitioning_algorithm)(struct partition_options *options);
+typedef void (*partitioning_algorithm)(struct partition_options *options, void bench_start(), void bench_end());
 
 #endif

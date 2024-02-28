@@ -1,6 +1,7 @@
 #ifndef CONCURRENT_OUTPUT
 #define CONCURRENT_OUTPUT
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <stdatomic.h>
@@ -20,7 +21,7 @@ struct concurrent_output_worker_args
 
 void *concurrent_worker(void *arguments);
 
-void concurrent_output(struct partition_options *options)
+void concurrent_output(struct partition_options *options, void bench_start(), void bench_end())
 {
     size_t num_partitions = (1 << options->hash_bits);
     atomic_size_t *partition_lengths = malloc(num_partitions * sizeof(atomic_size_t));
@@ -38,6 +39,8 @@ void concurrent_output(struct partition_options *options)
     pthread_t *threads = malloc(options->num_threads * sizeof(pthread_t));
     pthread_attr_t *attr = malloc(options->num_threads * sizeof(pthread_attr_t));
     struct concurrent_output_worker_args *args = malloc(options->num_threads * sizeof(struct concurrent_output_worker_args));
+
+    bench_start();
 
     for (int i = 0; i < options->num_threads; i++)
     {
@@ -71,6 +74,8 @@ void concurrent_output(struct partition_options *options)
         pthread_join(threads[i], NULL);
         pthread_attr_destroy(&attr[i]);
     }
+
+    bench_end();
 
 cleanup:
     for (int i = 0; i < num_partitions; i++)
