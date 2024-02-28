@@ -24,21 +24,21 @@ void *concurrent_worker(void *arguments);
 void concurrent_output(struct partition_options *options, void bench_start(), void bench_end())
 {
     size_t num_partitions = (1 << options->hash_bits);
-    atomic_size_t *partition_lengths = malloc(num_partitions * sizeof(atomic_size_t));
-    struct tuple **partitions = malloc(num_partitions * sizeof(struct tuple *));
+    atomic_size_t *partition_lengths = (atomic_size_t *)malloc(num_partitions * sizeof(atomic_size_t));
+    struct tuple **partitions = (struct tuple **)malloc(num_partitions * sizeof(struct tuple *));
 
     size_t expected_size = options->data_length / num_partitions;
     // TODO: re-evaluate. In our case its perfectly uniform.
     size_t partition_space = expected_size;
     for (int i = 0; i < num_partitions; i++)
     {
-        partitions[i] = malloc(partition_space * sizeof(struct tuple));
+        partitions[i] = (struct tuple *)malloc(partition_space * sizeof(struct tuple));
         partition_lengths[i] = 0;
     }
 
-    pthread_t *threads = malloc(options->num_threads * sizeof(pthread_t));
-    pthread_attr_t *attr = malloc(options->num_threads * sizeof(pthread_attr_t));
-    struct concurrent_output_worker_args *args = malloc(options->num_threads * sizeof(struct concurrent_output_worker_args));
+    pthread_t *threads = (pthread_t *)malloc(options->num_threads * sizeof(pthread_t));
+    pthread_attr_t *attr = (pthread_attr_t *)malloc(options->num_threads * sizeof(pthread_attr_t));
+    struct concurrent_output_worker_args *args = (struct concurrent_output_worker_args *)malloc(options->num_threads * sizeof(struct concurrent_output_worker_args));
 
     bench_start();
 
