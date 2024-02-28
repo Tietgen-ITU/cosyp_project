@@ -1,6 +1,7 @@
 #ifndef CONCURRENT_OUTPUT
 #define CONCURRENT_OUTPUT
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <stdatomic.h>
@@ -10,7 +11,7 @@
 // Add core affinity utils and dependencies
 #ifdef WITH_CORE_AFFINITY
 #include <sched.h>
-#include "affinity_utils.c"
+#include "affinity_utils.h"
 #endif
 
 struct concurrent_output_worker_args
@@ -26,11 +27,11 @@ struct concurrent_output_worker_args
 
 void *concurrent_worker(void *arguments);
 
-void concurrent_output(struct partition_options *options)
+void concurrent_output(struct partition_options *options, void bench_start(), void bench_end())
 {
     size_t num_partitions = (1 << options->hash_bits);
-    atomic_size_t *partition_lengths = malloc(num_partitions * sizeof(atomic_size_t));
-    struct tuple **partitions = malloc(num_partitions * sizeof(struct tuple *));
+    atomic_size_t *partition_lengths = (atomic_size_t *)malloc(num_partitions * sizeof(atomic_size_t));
+    struct tuple **partitions = (struct tuple **)malloc(num_partitions * sizeof(struct tuple *));
 
 #ifdef WITH_CORE_AFFINITY
     // Create cpu masks to define which thread to run on
@@ -42,13 +43,15 @@ void concurrent_output(struct partition_options *options)
     size_t partition_space = expected_size;
     for (int i = 0; i < num_partitions; i++)
     {
-        partitions[i] = malloc(partition_space * sizeof(struct tuple));
+        partitions[i] = (struct tuple *)malloc(partition_space * sizeof(struct tuple));
         partition_lengths[i] = 0;
     }
 
-    pthread_t *threads = malloc(options->num_threads * sizeof(pthread_t));
-    pthread_attr_t *attr = malloc(options->num_threads * sizeof(pthread_attr_t));
-    struct concurrent_output_worker_args *args = malloc(options->num_threads * sizeof(struct concurrent_output_worker_args));
+    pthread_t *threads = (pthread_t *)malloc(options->num_threads * sizeof(pthread_t));
+    pthread_attr_t *attr = (pthread_attr_t *)malloc(options->num_threads * sizeof(pthread_attr_t));
+    struct concurrent_output_worker_args *args = (struct concurrent_output_worker_args *)malloc(options->num_threads * sizeof(struct concurrent_output_worker_args));
+
+    bench_start();
 
     for (int i = 0; i < options->num_threads; i++)
     {
@@ -93,6 +96,8 @@ void concurrent_output(struct partition_options *options)
         pthread_join(threads[i], NULL);
         pthread_attr_destroy(&attr[i]);
     }
+
+    bench_end();
 
 cleanup:
     for (int i = 0; i < num_partitions; i++)

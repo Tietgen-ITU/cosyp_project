@@ -2,6 +2,7 @@
 #define INDEPENDENT_OUTPUT
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <pthread.h>
 #include <math.h>
 #include "hash.h"
@@ -10,7 +11,7 @@
 // Add core affinity utils and dependencies
 #ifdef WITH_CORE_AFFINITY
 #include <sched.h>
-#include "affinity_utils.c"
+#include "affinity_utils.h"
 #endif
 
 struct independent_output_worker_args
@@ -19,15 +20,23 @@ struct independent_output_worker_args
     size_t length;
     int thread_num;
     int hash_bits;
+    size_t *partition_lengths;
+    struct tuple **partitions;
 };
 
 void *independent_output_worker(void *arguments);
 
-void independent_output(struct partition_options *options)
+void independent_output(struct partition_options *options, void bench_start(), void bench_end())
 {
-    pthread_t *threads = malloc(options->num_threads * sizeof(pthread_t));
-    pthread_attr_t *attr = malloc(options->num_threads * sizeof(pthread_attr_t));
-    struct independent_output_worker_args *args = malloc(options->num_threads * sizeof(struct independent_output_worker_args));
+    pthread_t *threads = (pthread_t *)malloc(options->num_threads * sizeof(pthread_t));
+    pthread_attr_t *attr = (pthread_attr_t *)malloc(options->num_threads * sizeof(pthread_attr_t));
+    struct independent_output_worker_args *args = (struct independent_output_worker_args *)malloc(options->num_threads * sizeof(struct independent_output_worker_args));
+
+    size_t num_allocated_partitions = 0;
+    size_t **all_partition_lengths = (size_t **)malloc(options->num_threads * sizeof(size_t *));
+    struct tuple ***all_partitions = (struct tuple ***)malloc(options->num_threads * sizeof(struct tuple **));
+
+    size_t num_partitions = (1 << options->hash_bits);
 
 #ifdef WITH_CORE_AFFINITY
     // Create cpu masks to define which thread to run on
@@ -36,16 +45,42 @@ void independent_output(struct partition_options *options)
 
     for (int i = 0; i < options->num_threads; i++)
     {
+        num_allocated_partitions++;
+
         // Assume data_length is divisible by num_threads
         size_t length = options->data_length / options->num_threads;
         struct tuple *data = options->data + (i * length);
+
+        size_t expected_size = length / num_partitions;
+
+        // TODO: re-evaluate. 4x to minimise probability of exceeding buffer size.
+        // Could do wrap-around and overwrite previous entries? But this is wrong.
+        size_t partition_space = expected_size * 4;
+
+        size_t *partition_lengths = (size_t *)malloc(num_partitions * sizeof(size_t));
+        struct tuple **partitions = (struct tuple **)malloc(num_partitions * sizeof(struct tuple *));
+        for (int i = 0; i < num_partitions; i++)
+        {
+            partitions[i] = (struct tuple *)malloc(partition_space * sizeof(struct tuple));
+            partition_lengths[i] = 0;
+        }
+
+        all_partition_lengths[i] = partition_lengths;
+        all_partitions[i] = partitions;
 
         args[i] = (struct independent_output_worker_args){
             .data = data,
             .length = length,
             .thread_num = i,
-            .hash_bits = options->hash_bits};
+            .hash_bits = options->hash_bits,
+            .partition_lengths = partition_lengths,
+            .partitions = partitions};
+    }
 
+    bench_start();
+
+    for (int i = 0; i < options->num_threads; i++)
+    {
         if (pthread_attr_init(&attr[i]))
         {
             printf("Error initialising thread attributes %d - aborting\n", i);
@@ -76,7 +111,21 @@ void independent_output(struct partition_options *options)
         pthread_attr_destroy(&attr[i]);
     }
 
+    bench_end();
+
 cleanup:
+    for (int i = 0; i < num_allocated_partitions; i++)
+    {
+        for (int j = 0; j < num_partitions; j++)
+        {
+            free(all_partitions[i][j]);
+        }
+        free(all_partitions[i]);
+        free(all_partition_lengths[i]);
+    }
+    free(all_partitions);
+    free(all_partition_lengths);
+
     free(threads);
     free(attr);
     free(args);
@@ -87,28 +136,14 @@ cleanup:
 
 void *independent_output_worker(void *arguments)
 {
-    struct independent_output_worker_args args = *((struct independent_output_worker_args *)arguments);
-    size_t num_partitions = (1 << args.hash_bits);
-    size_t expected_size = args.length / num_partitions;
-
-    // TODO: re-evaluate. 4x to minimise probability of exceeding buffer size.
-    // Could do wrap-around and overwrite previous entries? But this is wrong.
-    size_t partition_space = expected_size * 4;
-
-    size_t *partition_lengths = malloc(num_partitions * sizeof(size_t));
-    struct tuple **partitions = malloc(num_partitions * sizeof(struct tuple *));
-    for (int i = 0; i < num_partitions; i++)
-    {
-        partitions[i] = malloc(partition_space * sizeof(struct tuple));
-        partition_lengths[i] = 0;
-    }
+    struct independent_output_worker_args args = *(struct independent_output_worker_args *)arguments;
 
     for (size_t i = 0; i < args.length; i++)
     {
         int64_t partition_index = hash(args.data[i].partitioning_key, args.hash_bits);
-        size_t cur_partition_length = partition_lengths[partition_index];
-        partitions[partition_index][cur_partition_length] = args.data[i];
-        partition_lengths[partition_index]++;
+        size_t cur_partition_length = args.partition_lengths[partition_index];
+        args.partitions[partition_index][cur_partition_length] = args.data[i];
+        args.partition_lengths[partition_index]++;
     }
 
     // debug print
@@ -121,11 +156,6 @@ void *independent_output_worker(void *arguments)
     // }
     // printf("\n\n");
     // pthread_mutex_unlock(&lock);
-
-    for (int i = 0; i < num_partitions; i++)
-        free(partitions[i]);
-    free(partitions);
-    free(partition_lengths);
 
     return NULL;
 }
