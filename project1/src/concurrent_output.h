@@ -7,6 +7,12 @@
 #include "hash.h"
 #include "partitioning_algorithm.h"
 
+// Add core affinity utils and dependencies
+#ifdef WITH_CORE_AFFINITY
+#include <sched.h>
+#include "affinity_utils.c"
+#endif
+
 struct concurrent_output_worker_args
 {
     struct tuple *data;
@@ -25,6 +31,11 @@ void concurrent_output(struct partition_options *options)
     size_t num_partitions = (1 << options->hash_bits);
     atomic_size_t *partition_lengths = malloc(num_partitions * sizeof(atomic_size_t));
     struct tuple **partitions = malloc(num_partitions * sizeof(struct tuple *));
+
+#ifdef WITH_CORE_AFFINITY
+    // Create cpu masks to define which thread to run on
+    cpu_set_t *cpuset = malloc(options->num_threads * sizeof(cpu_set_t));
+#endif
 
     size_t expected_size = options->data_length / num_partitions;
     // TODO: re-evaluate. In our case its perfectly uniform.
@@ -58,6 +69,17 @@ void concurrent_output(struct partition_options *options)
             printf("Error initialising thread attributes %d - aborting\n", i);
             goto cleanup;
         }
+
+#ifdef WITH_CORE_AFFINITY
+        // Set the core affinity for the thread
+        int thread_id = get_thread_id(i);
+        printf("Setting core affinity for thread %d\n", i);
+        CPU_ZERO(cpuset[i]);           // Reset the cpu set mask
+        CPU_SET(thread_id, cpuset[i]); // Set the cpu mask to point at the thread_id
+
+        // Apply core affinity info to the thread
+        pthread_attr_setaffinity_np(&attr[i], sizeof(cpu_set_t), &cpuset[i]);
+#endif
 
         if (pthread_create(&threads[i], &attr[i], concurrent_worker, &args[i]))
         {

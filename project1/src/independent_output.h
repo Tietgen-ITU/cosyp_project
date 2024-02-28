@@ -7,18 +7,10 @@
 #include "hash.h"
 #include "partitioning_algorithm.h"
 
+// Add core affinity utils and dependencies
 #ifdef WITH_CORE_AFFINITY
-
-// Add core affinity dependency
 #include <sched.h>
-#define should_get_neighbour_thread(i) (i % 2)
-
-/*
-Gets the thread id by the given index.
-
-It prioritizes getting thread ids that is on the same core.
-*/
-#define get_thread_id(i) ((should_get_neighbour_thread(i)) ? (15 + (i * 2)) : (i * 2))
+#include "affinity_utils.c"
 #endif
 
 struct independent_output_worker_args
@@ -38,6 +30,7 @@ void independent_output(struct partition_options *options)
     struct independent_output_worker_args *args = malloc(options->num_threads * sizeof(struct independent_output_worker_args));
 
 #ifdef WITH_CORE_AFFINITY
+    // Create cpu masks to define which thread to run on
     cpu_set_t *cpuset = malloc(options->num_threads * sizeof(cpu_set_t));
 #endif
 
@@ -60,11 +53,13 @@ void independent_output(struct partition_options *options)
         }
 
 #ifdef WITH_CORE_AFFINITY
+        // Set the core affinity for the thread
         int thread_id = get_thread_id(i);
         printf("Setting core affinity for thread %d\n", i);
         CPU_ZERO(cpuset[i]);           // Reset the cpu set mask
         CPU_SET(thread_id, cpuset[i]); // Set the cpu mask to point at the thread_id
 
+        // Apply core affinity info to the thread
         pthread_attr_setaffinity_np(&attr[i], sizeof(cpu_set_t), &cpuset[i]);
 #endif
 
