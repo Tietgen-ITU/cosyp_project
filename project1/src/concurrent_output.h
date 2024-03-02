@@ -76,9 +76,8 @@ void concurrent_output(struct partition_options *options, void bench_start(), vo
 #ifdef WITH_CORE_AFFINITY
         // Set the core affinity for the thread
         int thread_id = get_thread_id(i);
-        printf("Setting core affinity for thread %d\n", i);
-        CPU_ZERO(cpuset[i]);           // Reset the cpu set mask
-        CPU_SET(thread_id, cpuset[i]); // Set the cpu mask to point at the thread_id
+        CPU_ZERO(&cpuset[i]);           // Reset the cpu set mask
+        CPU_SET(thread_id, &cpuset[i]); // Set the cpu mask to point at the thread_id
 
         // Apply core affinity info to the thread
         pthread_attr_setaffinity_np(&attr[i], sizeof(cpu_set_t), &cpuset[i]);
