@@ -55,13 +55,16 @@ void independent_output(struct partition_options *options, void bench_start(), v
 
         // TODO: re-evaluate. 4x to minimise probability of exceeding buffer size.
         // Could do wrap-around and overwrite previous entries? But this is wrong.
-        size_t partition_space = expected_size * 4;
+        size_t partition_space = expected_size * 2;
 
         size_t *partition_lengths = (size_t *)malloc(num_partitions * sizeof(size_t));
+        printf("paritition_lengths pointer: %p\n", (void *)partition_lengths);
         struct tuple **partitions = (struct tuple **)malloc(num_partitions * sizeof(struct tuple *));
+        printf("parititions pointer: %p\n", (void *)partition_lengths);
         for (int i = 0; i < num_partitions; i++)
         {
             partitions[i] = (struct tuple *)malloc(partition_space * sizeof(struct tuple));
+            printf("paritition_space pointer: %p\n", (void *)partition_lengths);
             partition_lengths[i] = 0;
         }
 
