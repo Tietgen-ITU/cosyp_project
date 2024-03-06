@@ -1,5 +1,6 @@
 project1
 project1-ca
+bench-out/
 .vscode
 
 # Created by https://www.toptal.com/developers/gitignore/api/c
