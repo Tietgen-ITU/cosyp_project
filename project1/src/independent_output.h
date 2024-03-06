@@ -121,18 +121,18 @@ cleanup:
     {
         for (int j = 0; j < num_partitions; j++)
         {
-            printf("Free all_partitions: %d, %d\n", i, j);
-            printf("Pointer for all_partitions: %p\n", (void *)all_partitions[i][j]);
+            // printf("Free all_partitions: %d, %d\n", i, j);
+            // printf("Pointer for all_partitions: %p\n", (void *)all_partitions[i][j]);
             free(all_partitions[i][j]);
         }
-        printf("Free all_partitions: %d\n", i);
+        // printf("Free all_partitions: %d\n", i);
         free(all_partitions[i]);
-        printf("Free all_partition_lengths: %d\n", i);
+        // printf("Free all_partition_lengths: %d\n", i);
         free(all_partition_lengths[i]);
     }
-    printf("Free all_partitions");
+    // printf("Free all_partitions");
     free(all_partitions);
-    printf("Free all_partition_lengths");
+    // printf("Free all_partition_lengths");
     free(all_partition_lengths);
 
     free(threads);
