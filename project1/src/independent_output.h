@@ -64,7 +64,7 @@ void independent_output(struct partition_options *options, void bench_start(), v
         for (int i = 0; i < num_partitions; i++)
         {
             partitions[i] = (struct tuple *)malloc(partition_space * sizeof(struct tuple));
-            printf("paritition_space pointer: %p\n", (void *)partition_lengths);
+            printf("paritition_space pointer: %p\n", (void *)partitions[i]);
             partition_lengths[i] = 0;
         }
 
