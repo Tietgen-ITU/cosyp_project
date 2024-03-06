@@ -121,6 +121,7 @@ cleanup:
     {
         for (int j = 0; j < num_partitions; j++)
         {
+            printf("Free all_partitions: %d, %d\n", i, j);
             free(all_partitions[i][j]);
         }
         printf("Free all_partitions: %d\n", i);
