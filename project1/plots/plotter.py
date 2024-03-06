@@ -92,6 +92,7 @@ def read_data(filename):
 
     y_max = max(t for t in (c.throughput() for c in configurations) if t is not None)
 
+    plt.figure(figsize=(13, 5))
     for i, (group, configs) in enumerate(groups.items(), start=1):
         plt.subplot(1, len(groups), i)
         ax = plt.gca()
@@ -113,6 +114,7 @@ def read_data(filename):
         plt.title(group)
         plt.legend()
 
+    plt.savefig('plot.png', transparent=True)
     plt.show()
 
 
