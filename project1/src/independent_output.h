@@ -58,13 +58,13 @@ void independent_output(struct partition_options *options, void bench_start(), v
         size_t partition_space = expected_size * 2;
 
         size_t *partition_lengths = (size_t *)malloc(num_partitions * sizeof(size_t));
-        printf("paritition_lengths pointer: %p\n", (void *)partition_lengths);
+        // printf("paritition_lengths pointer: %p\n", (void *)partition_lengths);
         struct tuple **partitions = (struct tuple **)malloc(num_partitions * sizeof(struct tuple *));
-        printf("parititions pointer: %p\n", (void *)partition_lengths);
+        // printf("parititions pointer: %p\n", (void *)partition_lengths);
         for (int i = 0; i < num_partitions; i++)
         {
             partitions[i] = (struct tuple *)malloc(partition_space * sizeof(struct tuple));
-            printf("paritition_space pointer: %p\n", (void *)partitions[i]);
+            // printf("paritition_space pointer: %p\n", (void *)partitions[i]);
             partition_lengths[i] = 0;
         }
 
@@ -123,10 +123,14 @@ cleanup:
         {
             free(all_partitions[i][j]);
         }
+        printf("Free all_partitions: %d\n", i);
         free(all_partitions[i]);
+        printf("Free all_partition_lengths: %d\n", i);
         free(all_partition_lengths[i]);
     }
+    printf("Free all_partitions");
     free(all_partitions);
+    printf("Free all_partition_lengths");
     free(all_partition_lengths);
 
     free(threads);
