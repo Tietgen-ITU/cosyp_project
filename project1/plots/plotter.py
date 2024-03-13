@@ -14,6 +14,7 @@ class Configuration:
     tuples: int
     algorithm: str
     binary: str
+    original_rows: list['Row']
 
     def throughput(self):
         return self.tuples / (self.avg_time / 1000) / 1e6 if self.avg_time is not None else None
@@ -71,8 +72,12 @@ class Row:
             hash_bits=rows[0].hash_bits,
             tuples=rows[0].tuples,
             algorithm=rows[0].algorithm,
-            binary=rows[0].binary
+            binary=rows[0].binary,
+            original_rows=rows
         )
+
+    def throughput(self):
+        return self.tuples / (self.time / 1000) / 1e6 if self.time is not None else None
 
 
 def read_data(filename):
@@ -84,20 +89,26 @@ def read_data(filename):
     scenario_reps = [list(g) for _, g in groupby(
         sorted(rows, key=lambda x: x.configuration_key()), lambda x: x.configuration_key())]
 
+    plot_throughput(scenario_reps)
+
+
+def plot_throughput(scenario_reps: list[list[Row]]):
     configurations = [Row.averaged(reps) for reps in scenario_reps]
 
     algorithms = sorted(set(c.algorithm for c in configurations))
     groups = {a: [c for c in configurations if c.algorithm == a]
               for a in algorithms}
 
-    y_max = max(t for t in (c.throughput() for c in configurations) if t is not None)
+    y_max = max(t for t in (c.throughput()
+                for c in configurations) if t is not None)
 
     plt.figure(figsize=(13, 5))
     for i, (group, configs) in enumerate(groups.items(), start=1):
         plt.subplot(1, len(groups), i)
         ax = plt.gca()
 
-        configs = [c for c in configs if c.avg_time is not None and c.binary == "project1-ca"]
+        configs = [
+            c for c in configs if c.avg_time is not None and c.binary == "project1-ca"]
         configs.sort(key=lambda x: x.hash_bits)
         by_thread = {t: [c for c in configs if c.threads == t]
                      for t in sorted(set(c.threads for c in configs))}
@@ -114,6 +125,52 @@ def read_data(filename):
         plt.title(group)
         plt.legend()
 
+    plt.savefig('plot.pdf', format="pdf", bbox_inches="tight")
+    plt.show()
+
+
+def plot_variance(scenario_reps: list[list[Row]]):
+    configurations = [Row.averaged(reps) for reps in scenario_reps]
+
+    algorithms = sorted(set(c.algorithm for c in configurations))
+    groups = {a: [c for c in configurations if c.algorithm == a]
+              for a in algorithms}
+
+    y_max = max(t for t in (c.throughput()
+                for c in configurations) if t is not None)
+
+    binary = "project1-ca"
+    num_threads = 16
+
+    plt.figure(figsize=(13, 5))
+    for i, (group, configs) in enumerate(groups.items(), start=1):
+        plt.subplot(1, len(groups), i)
+
+        ax = plt.gca()
+
+        configs = [
+            c for c in configs if c.avg_time is not None and c.binary == binary]
+        configs.sort(key=lambda x: x.hash_bits)
+        by_thread = {t: [c for c in configs if c.threads == t]
+                     for t in sorted(set(c.threads for c in configs))}
+
+        with_thread_num = by_thread[num_threads]
+        xs = [[r.throughput() for r in x.original_rows]
+              for x in with_thread_num]
+        labels = [x.hash_bits for x in with_thread_num]
+
+        plt.boxplot(xs, labels=labels)  # ys, '-o', label=f"{threads} threads"
+
+        ax.set_xticks(sorted(set(c.hash_bits for c in configs)))
+        plt.ylim(0, y_max)
+        plt.xlabel("Number of hash bits")
+        plt.ylabel("Throughput (millions of tuples per second)")
+        plt.title(group)
+        plt.legend()
+
+    with_ness = "without" if binary == "project1" else "with"
+    plt.suptitle(
+        f"Throughput variance {with_ness} core affinity ({num_threads} threads)")
     plt.savefig('plot.png', transparent=True)
     plt.show()
 
