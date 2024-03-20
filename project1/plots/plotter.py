@@ -4,8 +4,15 @@ import re
 from itertools import groupby
 import os
 import sys
-import numpy as np
-import itertools
+
+
+def save_plot(name):
+    format = "png"
+    plt.savefig(f"plot_out/{name}.{format}",
+                format=format, bbox_inches="tight")
+
+
+binaries = ["project1", "project1-ca"]
 
 
 @dataclass
@@ -127,37 +134,35 @@ def plot_throughput(scenario_reps: list[list[Row]]):
     y_max = max(t for t in (c.throughput()
                 for c in configurations) if t is not None)
 
-    binary = "project1-ca"
+    for binary in binaries:
+        plt.figure(figsize=(13, 5))
+        for i, (group, configs) in enumerate(groups.items(), start=1):
+            plt.subplot(1, len(groups), i)
+            ax = plt.gca()
 
-    plt.figure(figsize=(13, 5))
-    for i, (group, configs) in enumerate(groups.items(), start=1):
-        plt.subplot(1, len(groups), i)
-        ax = plt.gca()
+            configs = [
+                c for c in configs if c.avg_time is not None and c.binary == binary]
+            configs.sort(key=lambda x: x.hash_bits)
+            by_thread = {t: [c for c in configs if c.threads == t]
+                         for t in sorted(set(c.threads for c in configs))}
 
-        configs = [
-            c for c in configs if c.avg_time is not None and c.binary == binary]
-        configs.sort(key=lambda x: x.hash_bits)
-        by_thread = {t: [c for c in configs if c.threads == t]
-                     for t in sorted(set(c.threads for c in configs))}
+            for threads, with_thread_num in by_thread.items():
+                xs = [x.hash_bits for x in with_thread_num]
+                ys = [x.throughput() for x in with_thread_num]
+                plt.plot(xs, ys, '-o', label=f"{threads} threads")
 
-        for threads, with_thread_num in by_thread.items():
-            xs = [x.hash_bits for x in with_thread_num]
-            ys = [x.throughput() for x in with_thread_num]
-            plt.plot(xs, ys, '-o', label=f"{threads} threads")
+            ax.set_xticks(sorted(set(c.hash_bits for c in configs)))
+            plt.ylim(0, y_max * 1.05)
+            plt.xlabel("Number of hash bits")
+            plt.ylabel("Throughput (millions of tuples per second)")
+            plt.title(group)
+            plt.legend()
 
-        ax.set_xticks(sorted(set(c.hash_bits for c in configs)))
-        plt.ylim(0, y_max * 1.05)
-        plt.xlabel("Number of hash bits")
-        plt.ylabel("Throughput (millions of tuples per second)")
-        plt.title(group)
-        plt.legend()
+        with_ness = "without" if binary == "project1" else "with"
+        plt.suptitle(
+            f"Scaling of partitioning throughput with number of threads and hash bits ({with_ness} core affinity)")
 
-    with_ness = "without" if binary == "project1" else "with"
-    plt.suptitle(
-        f"Scaling of partitioning throughput with number of threads and hash bits ({with_ness} core affinity)")
-
-    plt.savefig('plot.pdf', format="pdf", bbox_inches="tight")
-    plt.show()
+        save_plot(f"throughput_{binary}")
 
 
 def plot_variance(scenario_reps: list[list[Row]]):
@@ -170,40 +175,40 @@ def plot_variance(scenario_reps: list[list[Row]]):
     y_max = max(t for t in (c.throughput()
                 for c in configurations) if t is not None)
 
-    binary = "project1"
     num_threads = 16
 
-    plt.figure(figsize=(13, 5))
-    for i, (group, configs) in enumerate(groups.items(), start=1):
-        plt.subplot(1, len(groups), i)
+    for binary in binaries:
+        plt.figure(figsize=(13, 5))
+        for i, (group, configs) in enumerate(groups.items(), start=1):
+            plt.subplot(1, len(groups), i)
 
-        ax = plt.gca()
+            ax = plt.gca()
 
-        configs = [
-            c for c in configs if c.avg_time is not None and c.binary == binary]
-        configs.sort(key=lambda x: x.hash_bits)
-        by_thread = {t: [c for c in configs if c.threads == t]
-                     for t in sorted(set(c.threads for c in configs))}
+            configs = [
+                c for c in configs if c.avg_time is not None and c.binary == binary]
+            configs.sort(key=lambda x: x.hash_bits)
+            by_thread = {t: [c for c in configs if c.threads == t]
+                         for t in sorted(set(c.threads for c in configs))}
 
-        with_thread_num = by_thread[num_threads]
-        xs = [[r.throughput() for r in x.original_rows]
-              for x in with_thread_num]
-        labels = [x.hash_bits for x in with_thread_num]
+            with_thread_num = by_thread[num_threads]
+            xs = [[r.throughput() for r in x.original_rows]
+                  for x in with_thread_num]
+            labels = [x.hash_bits for x in with_thread_num]
 
-        plt.boxplot(xs, labels=labels)  # ys, '-o', label=f"{threads} threads"
+            # ys, '-o', label=f"{threads} threads"
+            plt.boxplot(xs, labels=labels)
 
-        ax.set_xticks(sorted(set(c.hash_bits for c in configs)))
-        plt.ylim(0, y_max)
-        plt.xlabel("Number of hash bits")
-        plt.ylabel("Throughput (millions of tuples per second)")
-        plt.title(group)
-        plt.legend()
+            ax.set_xticks(sorted(set(c.hash_bits for c in configs)))
+            plt.ylim(0, y_max)
+            plt.xlabel("Number of hash bits")
+            plt.ylabel("Throughput (millions of tuples per second)")
+            plt.title(group)
 
-    with_ness = "without" if binary == "project1" else "with"
-    plt.suptitle(
-        f"Throughput variance {with_ness} core affinity ({num_threads} threads)")
-    plt.savefig('plot.png', transparent=True)
-    plt.show()
+        with_ness = "without" if binary == "project1" else "with"
+        plt.suptitle(
+            f"Throughput variance {with_ness} core affinity ({num_threads} threads)")
+
+        save_plot(f"variance_{binary}")
 
 
 def plot_perf_stuff(scenario_reps: list[list[Row]]):
@@ -221,7 +226,6 @@ def plot_perf_stuff(scenario_reps: list[list[Row]]):
         "llc_load_misses": "LLC load misses",
     }
 
-    binaries = ["project1", "project1-ca"]
     metrics = list(metric_labels.keys())
     combinations = [(x, y) for x in binaries for y in metrics]
 
@@ -258,10 +262,7 @@ def plot_perf_stuff(scenario_reps: list[list[Row]]):
         plt.suptitle(
             f"Scaling of {metric_labels[metric]} with number of threads and hash bits ({with_ness} core affinity)")
 
-        format = "png"
-        name = f"{metric}_{binary}.{format}"
-        plt.savefig(f"plot_out/{name}", format=format, bbox_inches="tight")
-        # plt.show()
+        save_plot(f"{metric}_{binary}")
 
 
 if __name__ == "__main__":
@@ -274,4 +275,9 @@ if __name__ == "__main__":
     scenario_reps = [list(g) for _, g in groupby(
         sorted(measurements, key=lambda x: x.configuration_key()), lambda x: x.configuration_key())]
 
+    print(f"Plotting throughput")
+    plot_throughput(scenario_reps)
+    print(f"Plotting perf metrics")
     plot_perf_stuff(scenario_reps)
+    print(f"Plotting variance")
+    plot_variance(scenario_reps)
