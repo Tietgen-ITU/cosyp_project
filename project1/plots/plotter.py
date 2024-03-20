@@ -124,6 +124,14 @@ def read_data(folder):
     return rows
 
 
+def load_baseline(baseline_dir):
+    measurements = read_data(baseline_dir)
+    scenario_reps = [list(g) for _, g in groupby(
+        sorted(measurements, key=lambda x: x.configuration_key()), lambda x: x.configuration_key())]
+    configurations = [Row.averaged(reps) for reps in scenario_reps]
+    return configurations
+
+
 def plot_throughput(scenario_reps: list[list[Row]]):
     configurations = [Row.averaged(reps) for reps in scenario_reps]
 
@@ -230,8 +238,9 @@ def plot_perf_stuff(scenario_reps: list[list[Row]]):
     combinations = [(x, y) for x in binaries for y in metrics]
 
     for binary, metric in combinations:
-        y_max = max(t for t in (getattr(c, metric)
-                                for c in configurations) if t is not None)
+        ys = [t for t in (getattr(c, metric)
+                          for c in configurations) if t is not None]
+        y_max, y_min = max(ys), min(ys)
 
         plt.figure(figsize=(13, 5))
         for i, (group, configs) in enumerate(groups.items(), start=1):
@@ -250,7 +259,7 @@ def plot_perf_stuff(scenario_reps: list[list[Row]]):
                 plt.plot(xs, ys, '-o', label=f"{threads} threads")
 
             ax.set_xticks(sorted(set(c.hash_bits for c in configs)))
-            plt.ylim(0, y_max)
+            plt.ylim(y_min, y_max)
             plt.xlabel("Number of hash bits")
             plt.ylabel(f"Number of {metric_labels[metric]}")
             plt.title(group)
@@ -271,6 +280,17 @@ if __name__ == "__main__":
         exit(1)
 
     measurements = read_data(sys.argv[1])
+
+    baselines = load_baseline("./benches/baseline-bench-1710946366")
+
+    for row in measurements:
+        baseline_row = next(b for b in baselines if b.original_rows[0].configuration_key(
+        ) == row.configuration_key())
+        row.context_switches -= baseline_row.context_switches
+        row.cpu_migrations -= baseline_row.cpu_migrations
+        row.dtlb_load_misses -= baseline_row.dtlb_load_misses
+        row.l1_dcache_load_misses -= baseline_row.l1_dcache_load_misses
+        row.llc_load_misses -= baseline_row.llc_load_misses
 
     scenario_reps = [list(g) for _, g in groupby(
         sorted(measurements, key=lambda x: x.configuration_key()), lambda x: x.configuration_key())]
