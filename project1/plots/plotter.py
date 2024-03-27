@@ -239,12 +239,19 @@ def plot_perf_stuff(scenario_reps: list[list[Row]]):
         "llc_load_misses": "LLC load misses",
     }
 
+    per_tuple_metrics = ["dtlb_load_misses", "l1_dcache_load_misses", "llc_load_misses"]
+
     metrics = list(metric_labels.keys())
     combinations = [(x, y) for x in binaries for y in metrics]
 
     for binary, metric in combinations:
         ys = [t for t in (getattr(c, metric)
                           for c in configurations) if t is not None]
+
+        is_per_tuple = metric in per_tuple_metrics
+        if is_per_tuple:
+            ys = [y / c.tuples for y, c in zip(ys, configurations)]
+
         y_max, y_min = max(ys), min(ys)
 
         plt.figure(figsize=(13, 5))
@@ -261,14 +268,20 @@ def plot_perf_stuff(scenario_reps: list[list[Row]]):
             for i, (threads, with_thread_num) in enumerate(by_thread.items()):
                 xs = [x.hash_bits for x in with_thread_num]
                 ys = [getattr(x, metric) for x in with_thread_num]
+
+                if is_per_tuple:
+                    ys = [y / x.tuples for x, y in zip(with_thread_num, ys)]
+
                 marker, facecolor = MARKERS[i]
                 plt.plot(
                     xs, ys, f'-{marker}', markerfacecolor=facecolor, label=f"{threads} threads")
 
+            suffix = " per tuple" if is_per_tuple else ""
+
             ax.set_xticks(sorted(set(c.hash_bits for c in configs)))
-            plt.ylim(y_min, y_max)
+            plt.ylim(y_min, y_max * 1.05)
             plt.xlabel("Number of hash bits")
-            plt.ylabel(f"Number of {metric_labels[metric]}")
+            plt.ylabel(f"Number of {metric_labels[metric]}{suffix}")
             plt.title(group)
             plt.legend()
             # plt.yscale("log", base=10)
