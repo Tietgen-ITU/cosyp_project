@@ -7,12 +7,15 @@ import sys
 
 
 def save_plot(name):
-    format = "png"
-    plt.savefig(f"plot_out/{name}.{format}",
+    format = "pdf"
+    plt.savefig(f"plot_out/{format}/{name}.{format}",
                 format=format, bbox_inches="tight")
 
 
 binaries = ["project1", "project1-ca"]
+
+MARKERS = [('|', None), ('x', None), ('*', None),
+           ('s', 'none'), ('s', None), ('o', 'none')]
 
 
 @dataclass
@@ -154,10 +157,12 @@ def plot_throughput(scenario_reps: list[list[Row]]):
             by_thread = {t: [c for c in configs if c.threads == t]
                          for t in sorted(set(c.threads for c in configs))}
 
-            for threads, with_thread_num in by_thread.items():
+            for i, (threads, with_thread_num) in enumerate(by_thread.items()):
                 xs = [x.hash_bits for x in with_thread_num]
                 ys = [x.throughput() for x in with_thread_num]
-                plt.plot(xs, ys, '-o', label=f"{threads} threads")
+                marker, facecolor = MARKERS[i]
+                plt.plot(
+                    xs, ys, f'-{marker}', markerfacecolor=facecolor, label=f"{threads} threads")
 
             ax.set_xticks(sorted(set(c.hash_bits for c in configs)))
             plt.ylim(0, y_max * 1.05)
@@ -253,10 +258,12 @@ def plot_perf_stuff(scenario_reps: list[list[Row]]):
             by_thread = {t: [c for c in configs if c.threads == t]
                          for t in sorted(set(c.threads for c in configs))}
 
-            for threads, with_thread_num in by_thread.items():
+            for i, (threads, with_thread_num) in enumerate(by_thread.items()):
                 xs = [x.hash_bits for x in with_thread_num]
                 ys = [getattr(x, metric) for x in with_thread_num]
-                plt.plot(xs, ys, '-o', label=f"{threads} threads")
+                marker, facecolor = MARKERS[i]
+                plt.plot(
+                    xs, ys, f'-{marker}', markerfacecolor=facecolor, label=f"{threads} threads")
 
             ax.set_xticks(sorted(set(c.hash_bits for c in configs)))
             plt.ylim(y_min, y_max)
