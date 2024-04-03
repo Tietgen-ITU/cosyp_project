@@ -119,8 +119,11 @@ class Row:
 def read_data(folder):
     rows = []
     for entry in os.listdir(folder):
-        row = Row.from_file(os.path.join(folder, entry))
-        rows.append(row)
+        try:
+            row = Row.from_file(os.path.join(folder, entry))
+            rows.append(row)
+        except:
+            print(f"Error processing {entry}")
 
     print(f"Loaded {len(rows)} experiments")
 
