@@ -1,0 +1,7 @@
+FROM elasticsearch:8.13.0
+
+EXPOSE 9200
+EXPOSE 9300
+
+# https://www.elastic.co/guide/en/elasticsearch/reference/7.5/docker.html
+ENV discovery.type=single-node
