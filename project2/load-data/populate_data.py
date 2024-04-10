@@ -2,6 +2,7 @@ import requests
 import os
 import shutil
 import bz2
+import xml.etree.ElementTree as ET
 
 
 DUMP_HOST_URL = "https://dumps.wikimedia.org"
@@ -37,7 +38,8 @@ def decompress_articles():
 
     for file in os.listdir(archive_dir):
         archive_path = os.path.join(archive_dir, file)
-        decompressed_path = os.path.join(decompressed_dir, file.replace(".bz2", ""))
+        decompressed_path = os.path.join(
+            decompressed_dir, file.replace(".bz2", ""))
 
         print(f"Decompressing {archive_path}")
         with open(archive_path, 'rb') as source, open(decompressed_path, 'wb') as dest:
@@ -46,10 +48,39 @@ def decompress_articles():
         print(f"Decompressed {file} to {decompressed_path}")
         print()
 
+
+def load_article_xml(file):
+    print(f"Parsing {file}")
+    tree = ET.parse(file)
+    print(f"Parsed {file}")
+
+    print("Reading pages")
+    root = tree.getroot()
+
+    def tag(x): return f"{{http://www.mediawiki.org/xml/export-0.10/}}{x}"
+    def untag(x): return x.replace(
+        "{http://www.mediawiki.org/xml/export-0.10/}", "")
+
+    n = 0
+    for page in root.findall(tag("page")):
+        print(f"Article {n+1}: {page.find(tag('title')).text}")
+        for revision in page.findall(tag('revision')):
+            for text in revision.findall(tag('text')):
+                print(f"Text: {text.text}")
+
+        n += 1
+        if n >= 2:
+            break
+    print("Finished reading pages")
+
+
 def main():
     # get_all_files()
     # decompress_articles()
+    load_article_xml(
+        "articles/decompressed/enwiki-20240401-pages-articles1.xml-p1p41242")
     pass
+
 
 if __name__ == '__main__':
     main()
