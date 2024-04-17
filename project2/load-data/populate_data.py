@@ -3,6 +3,9 @@ import os
 import shutil
 import bz2
 import xml.etree.ElementTree as ET
+import psycopg2
+from psycopg2.extras import execute_batch
+from typing import Union
 
 
 DUMP_HOST_URL = "https://dumps.wikimedia.org"
@@ -49,7 +52,7 @@ def decompress_articles():
         print()
 
 
-def load_article_xml(file):
+def load_articles_xml(file):
     print(f"Parsing {file}")
     tree = ET.parse(file)
     print(f"Parsed {file}")
@@ -61,24 +64,47 @@ def load_article_xml(file):
     def untag(x): return x.replace(
         "{http://www.mediawiki.org/xml/export-0.10/}", "")
 
-    n = 0
+    pages: list[Union[str, str]] = []
     for page in root.findall(tag("page")):
-        print(f"Article {n+1}: {page.find(tag('title')).text}")
-        for revision in page.findall(tag('revision')):
-            for text in revision.findall(tag('text')):
-                print(f"Text: {text.text}")
+        title = page.find(tag('title')).text
+        revision = page.find(tag('revision'))
+        text = revision.find(tag('text'))
+        pages.append((title, text.text))
 
-        n += 1
-        if n >= 2:
-            break
-    print("Finished reading pages")
+    print(f"Loaded {len(pages)} pages")
+
+    return pages
+
+
+def insert_into_postgres(pages: list[Union[str, str]]):
+    con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:5049/cosyp")
+    cur = con.cursor()
+
+    print("Inserting pages")
+    execute_batch(cur, "INSERT INTO articles (title, body) VALUES (%s, %s)", pages)
+    con.commit()
+    print("Inserted pages")
+
+    # To create a full text search index:
+    #
+    #   ALTER TABLE articles ADD COLUMN search_vector tsvector;
+    #   UPDATE articles SET search_vector = to_tsvector('english', title || ' ' || content);
+    #   CREATE INDEX articles_search_vector_idx ON articles USING gin(search_vector);
+    #
+    # To search:
+    #
+    #   SELECT title, ts_rank(search_vector, to_tsquery('english', 'search term')) as rank
+    #   FROM articles
+    #   WHERE search_vector @@ to_tsquery('english', 'search term')
+    #   ORDER BY rank DESC;
 
 
 def main():
     # get_all_files()
     # decompress_articles()
-    load_article_xml(
+    pages = load_articles_xml(
         "articles/decompressed/enwiki-20240401-pages-articles1.xml-p1p41242")
+    insert_into_postgres(pages)
     pass
 
 
