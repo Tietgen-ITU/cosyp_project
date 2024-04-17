@@ -13,8 +13,8 @@ ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 ssh.connect('hpc.itu.dk', username=username, password=password)
 
 # Upload files from our src directory to the remote directory
-local_dir = './src/'
-remote_dir = '~/cosyp/'
+local_dir = './src'
+remote_dir = '~/cosyp'
 with SCPClient(ssh.get_transport()) as scp:
     scp.put(local_dir, remote_dir, recursive=True)
 
