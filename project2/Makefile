@@ -12,3 +12,9 @@ connect-postgres:
 
 connect-postgres-local:
 	psql postgresql://cosyp-sa:123@localhost:5049/cosyp
+
+build-elasticsearch:
+	docker build -t cosyp-elastic:latest -f Dockerfile.elastic .
+
+spawn-elasticsearch:
+	docker run --name cosyp-elastic -p 127.0.0.1:9200:9200 -p 127.0.0.1:9300:9300 -d cosyp-elastic:latest
