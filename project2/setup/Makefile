@@ -1,8 +1,14 @@
 build-postgres:
-	docker build -t cosyp-psql:latest -f Dockerfile.psql . 
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t arne4545/cosyp-psql:latest -f Dockerfile.psql .
 
 interact-postgres:
-	docker run -it cosyp-psql:latest bash
+	docker run -it arne4545/cosyp-psql:latest bash
+
+build-elastic:
+	docker buildx build --push --platform linux/amd64,linux/arm64 -t arne4545/cosyp-elastic:latest -f Dockerfile.elastic .
+
+interact-elastic:
+	docker run -it arne4545/cosyp-elastic:latest bash
 
 spawn-postgres:
 	docker run --name cosyp-postgres -p 127.0.0.1:5049:5432 -d cosyp-psql:latest
