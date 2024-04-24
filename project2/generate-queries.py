@@ -2,10 +2,11 @@ import psycopg2
 import string
 import random
 import time
-
+from elasticsearch import Elasticsearch
 
 con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:5049/cosyp")
 cur = con.cursor()
+es = Elasticsearch("http://localhost:9200")
 
 
 def generate_queries():
@@ -45,13 +46,15 @@ def generate_queries():
 if __name__ == "__main__":
     queries = generate_queries()
 
+    LIMIT = 5
+
     for i, term in enumerate(queries[:5]):
         query = f"""
             SELECT title, ts_rank(search_vector, plainto_tsquery('english', %(term)s)) as rank
             FROM articles
             WHERE search_vector @@ plainto_tsquery('english', %(term)s)
             ORDER BY rank DESC
-            LIMIT 10;
+            LIMIT {LIMIT};
         """
 
         start = time.time()
@@ -59,8 +62,20 @@ if __name__ == "__main__":
         alles = cur.fetchall()
         end = time.time()
 
-        print(f"{i}) Results for '{term}' ({end - start:.2f}s)")
+        print(f"{i}) Postgres results for '{term}' ({end - start:.2f}s)")
         for title, rank in alles:
-            print(f"{rank} | {title}")
+            print("  ", f"{rank:05} | {title}")
 
+        start = time.time()
+        res = es.search(index="articles", query={
+                        'match': {'body': term}}, fields=["title"], source=False, size=LIMIT)
+        end = time.time()
+
+        print()
+
+        print(f"{i}) Elasticsearch results for '{term}' ({end - start:.2f}s)")
+        for hit in res['hits']['hits']:
+            print("  ", f'{hit["_score"]:05}', "|", hit['fields']['title'][0])
+
+        print()
         print()
