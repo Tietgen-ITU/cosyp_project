@@ -7,5 +7,4 @@ ENV POSTGRES_PASSWORD=${USER_PWD}
 ENV POSTGRES_DB=cosyp
 
 WORKDIR /db-setup
-COPY . /db-setup
 COPY schema.sql /docker-entrypoint-initdb.d
