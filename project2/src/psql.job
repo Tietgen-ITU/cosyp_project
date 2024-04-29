@@ -7,6 +7,6 @@
 #SBATCH --mail-type=BEGIN,FAIL,END
 
 module load singularity
-singularity run -B pgdata:/var/lib/postgresql/data -B pgrun:/var/run/postgresql -e -C ~/cosyp/psql.sif &
+singularity run -B pgdata:/var/lib/postgresql/data -B pgrun:/var/run/postgresql -e -C ~/cosyp/psql.sif & # TODO: Get specific paramters from Viktor
 
 # TODO: Run Adrians setup stuff here...

@@ -6,7 +6,8 @@
 #SBATCH --partition=brown
 #SBATCH --mail-type=BEGIN,FAIL,END
 
+
 module load singularity
-singularity run -e -C ~/cosyp/elastic.sif &
+singularity run -e -C ~/cosyp/psql.sif & # Get the specific parameters from Viktor
 
 # TODO: Run Adrians setup stuff here...
