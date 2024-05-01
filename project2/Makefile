@@ -1,20 +1,6 @@
-build-postgres:
-	docker build -t cosyp-psql:latest -f Dockerfile.psql . 
+.PHONY: setup
+setup:
+	python3 -m pip install paramiko scpclient scp
 
-interact-postgres:
-	docker run -it cosyp-psql:latest bash
-
-spawn-postgres:
-	docker run --name cosyp-postgres -p 127.0.0.1:5049:5432 -d cosyp-psql:latest
-
-connect-postgres:
-	docker exec -it cosyp-postgres psql -d cosyp -U cosyp-sa
-
-connect-postgres-local:
-	psql postgresql://cosyp-sa:123@localhost:5049/cosyp
-
-build-elasticsearch:
-	docker build -t cosyp-elastic:latest -f Dockerfile.elastic .
-
-spawn-elasticsearch:
-	docker run --name cosyp-elastic -p 127.0.0.1:9200:9200 -p 127.0.0.1:9300:9300 -d cosyp-elastic:latest
+sched-job:
+	python3 sched-job.py

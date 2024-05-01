@@ -1,0 +1,12 @@
+#!/bin/bash
+#SBATCH --job-name=cosyp-psql               # Job name
+#SBATCH --output=cosyp-psql.job.%j.o        # Name of output file (%j expands to jobId)
+#SBATCH --cpus-per-task=2                   # Schedule 8 cores (includes hyperthreading)
+#SBATCH --time=2:00:00                      # Run time (hh:mm:ss) - run for one hour max
+#SBATCH --partition=brown
+#SBATCH --mail-type=BEGIN,FAIL,END
+
+module load singularity
+singularity run -B pgdata:/var/lib/postgresql/data -B pgrun:/var/run/postgresql -e -C ~/cosyp/psql.sif & # TODO: Get specific paramters from Viktor
+
+# TODO: Run Adrians setup stuff here...
