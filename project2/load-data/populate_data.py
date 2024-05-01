@@ -19,7 +19,7 @@ def get_all_files():
     response = requests.get(dumpstatus_url).json()
     article_files = response['jobs']['articlesdump']['files']
 
-    keys = [list(article_files.keys())[0]]
+    keys = list(article_files.keys())
 
     print(f"Downloading {len(keys)} files\n")
 
