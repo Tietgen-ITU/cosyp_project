@@ -119,14 +119,23 @@ def insert_into_elasticsearch(pages: list[Union[str, str]]):
     # Query:
     #   es.search(index="articles", query={'match':{'body':'serach term'}}, fields=["title"], source=False)
 
+def handle_data_loading():
 
 def main():
-    # get_all_files()
-    # decompress_articles()
-    pages = load_articles_xml(
-        "articles/decompressed/enwiki-20240401-pages-articles1.xml-p1p41242")
-    # insert_into_postgres(pages)
-    # insert_into_elasticsearch(pages)
+    if len(sys.argv) < 2:
+        print("Usage: python populate_data.py <command>")
+        sys.exit(1)
+
+    match sys.argv[1]:
+        case "download":
+            get_all_files()
+        case "decompress":
+            decompress_articles()
+        case "load":
+            handle_data_loading()
+        case _:
+            print("Invalid command")
+            sys.exit(1)
     pass
 
 
