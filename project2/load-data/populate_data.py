@@ -4,6 +4,7 @@ import shutil
 import bz2
 import xml.etree.ElementTree as ET
 import psycopg2
+import sys
 from psycopg2.extras import execute_batch
 from typing import Union
 from elasticsearch import Elasticsearch
@@ -120,6 +121,29 @@ def insert_into_elasticsearch(pages: list[Union[str, str]]):
     #   es.search(index="articles", query={'match':{'body':'serach term'}}, fields=["title"], source=False)
 
 def handle_data_loading():
+
+    datadir_path = "articles/decompressed/"
+
+    loaddata = None # Declare loaddata function
+    mode = "--both" if len(sys.argv) < 3 else sys.argv[2]
+    match mode:
+        case "--postgres":
+            loaddata = lambda pages: insert_into_postgres(pages)
+        case "--elastic":
+            loaddata = lambda pages: insert_into_elasticsearch(pages)
+        case "--both":
+            loaddata = lambda pages: insert_into_postgres(pages); insert_into_elasticsearch(pages)
+        case _:
+            print("Invalid load category")
+            sys.exit(1)
+    pass
+
+    decompressed_dir = os.scandir(datadir_path)
+
+    for io_entry in decompressed_dir:
+        if io_entry.is_file():
+            pages = load_articles_xml(io_entry.path)
+            loaddata(pages)
 
 def main():
     if len(sys.argv) < 2:
