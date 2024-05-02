@@ -8,6 +8,7 @@ import sys
 from psycopg2.extras import execute_batch
 from typing import Union
 from elasticsearch import Elasticsearch
+import time
 
 
 DUMP_HOST_URL = "https://dumps.wikimedia.org"
@@ -25,6 +26,8 @@ def get_all_files():
     print(f"Downloading {len(keys)} files\n")
 
     for i, key in enumerate(keys):
+        start = time.time()
+
         url = f"{DUMP_HOST_URL}{article_files[key]['url']}"
         print(f"Downloading {i+1}/{len(keys)}: {url}")
         print(f"Size: {article_files[key]['size'] * 1e-6:.2f} MB")
@@ -34,7 +37,9 @@ def get_all_files():
             with open(file, 'wb') as f:
                 shutil.copyfileobj(r.raw, f)
 
+        end = time.time()
         print(f"Finished downloading: {file}")
+        print(f"Took {end - start:.1f} seconds")
         print()
 
 
