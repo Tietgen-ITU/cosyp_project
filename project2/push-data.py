@@ -18,4 +18,4 @@ if __name__ == "__main__":
     ssh.connect('hpc.itu.dk', username=username, password=password)
 
     print('Copying data files to shared remote...')
-    copy_to_remote(ssh, './data', '/scratch/group_brrrrr')
+    copy_to_remote(ssh, './load-data/articles/decompressed', '/scratch/group_brrrrr')
