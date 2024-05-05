@@ -1,14 +1,23 @@
 import string
 import random
+from itertools import cycle
 
 
-def generate_queries(cur):
-    random_query = """
-        SELECT title, body FROM articles TABLESAMPLE SYSTEM(1)
+def generate_queries(cur, num_terms=10, max_articles=1000, seed=None):
+    random.seed(seed)
+
+    random_query = f"""
+        SELECT title, body FROM articles
+        TABLESAMPLE SYSTEM(100)
+        {f"REPEATABLE({seed})" if seed else ""}
+        LIMIT {min(num_terms, max_articles)};
     """
     cur.execute(random_query)
 
     all = cur.fetchall()
+
+    # If we want more search terms than articles fetched, wrap around
+    articles_iter = cycle(all)
 
     special_chars = set()
     for _, body in all:
@@ -18,8 +27,11 @@ def generate_queries(cur):
 
     banned = set(["REDIRECT", "ref", "nbsp"])
 
-    queries = []
-    for i, (_, body) in enumerate(all):
+    search_terms = set()
+
+    while len(search_terms) < num_terms:
+        _, body = next(articles_iter)
+
         trans = {c: " " for c in special_chars}
         table = str.maketrans(trans)
         normalised = body.translate(table)
@@ -29,8 +41,8 @@ def generate_queries(cur):
         length = min(random.randint(1, 6), len(parts))
         start_index = random.randint(0, len(parts) - length)
 
-        query = " ".join(parts[start_index:start_index + length])
+        search_term = " ".join(parts[start_index:start_index + length])
 
-        queries.append(query)
+        search_terms.add(search_term)
 
-    return queries
+    return search_terms

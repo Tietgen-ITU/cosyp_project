@@ -30,7 +30,8 @@ def measure_query(search_term, runners):
 
         bench["elapsed_ms"][name] = (end - start) * 1e-6
 
-    print(json.dumps(bench, indent=2 if IS_VERBOSE else None))
+    return bench
+
 
 def query_postgres(cur, term):
     query = f"""
@@ -70,7 +71,19 @@ if __name__ == "__main__":
         ('elasticsearch', lambda term: query_elasticsearch(es, term))
     ]
 
-    search_terms = generate_queries(pg)
+    query_settings = {
+        "num_terms": 2500,
+        "max_articles": 1000,
+        "seed": 42,
+    }
 
-    for i, term in enumerate(search_terms[:5]):
-        measure_query(term, runners)
+    print(f"Generating {query_settings['num_terms']} search terms...")
+    start = time.monotonic()
+    search_terms = generate_queries(pg, **query_settings)
+    end = time.monotonic()
+    print(f"Generated search terms in {end - start:.2f}s")
+
+    for i, term in enumerate(search_terms):
+        bench = measure_query(term, runners)
+        bench["index"] = i
+        print(json.dumps(bench, indent=2 if IS_VERBOSE else None), flush=True)
