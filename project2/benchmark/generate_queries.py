@@ -3,14 +3,14 @@ import random
 from itertools import cycle
 
 
-def generate_queries(cur, num_terms=10, max_articles=1000, seed=None):
+def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, seed=None):
     random.seed(seed)
 
     random_query = f"""
         SELECT title, body FROM articles
         TABLESAMPLE SYSTEM(100)
         {f"REPEATABLE({seed})" if seed else ""}
-        LIMIT {min(num_terms, max_articles)};
+        LIMIT {min(num_queries, max_articles_sourced)};
     """
     cur.execute(random_query)
 
@@ -29,7 +29,7 @@ def generate_queries(cur, num_terms=10, max_articles=1000, seed=None):
 
     search_terms = set()
 
-    while len(search_terms) < num_terms:
+    while len(search_terms) < num_queries:
         _, body = next(articles_iter)
 
         trans = {c: " " for c in special_chars}
@@ -45,4 +45,4 @@ def generate_queries(cur, num_terms=10, max_articles=1000, seed=None):
 
         search_terms.add(search_term)
 
-    return search_terms
+    return list(search_terms)

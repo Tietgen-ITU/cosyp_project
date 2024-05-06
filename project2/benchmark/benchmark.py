@@ -1,7 +1,7 @@
 import psycopg2
 import time
 from elasticsearch import Elasticsearch
-from generate_queries import generate_queries
+from generate_queries import generate_search_terms
 import sys
 import json
 
@@ -17,20 +17,15 @@ def connect():
     return pg, es
 
 
-def measure_query(search_term, runners):
-    bench = {
-        "search_term": search_term,
-        "elapsed_ms": {}
+def measure_query(id, search_term, runner):
+    start = time.monotonic_ns()
+    runner(search_term)
+    end = time.monotonic_ns()
+
+    return {
+        "id": id,
+        "elapsed_ms": (end - start) * 1e-6
     }
-
-    for name, runner in runners:
-        start = time.monotonic_ns()
-        runner(search_term)
-        end = time.monotonic_ns()
-
-        bench["elapsed_ms"][name] = (end - start) * 1e-6
-
-    return bench
 
 
 def query_postgres(cur, term):
@@ -71,19 +66,60 @@ if __name__ == "__main__":
         ('elasticsearch', lambda term: query_elasticsearch(es, term))
     ]
 
-    query_settings = {
-        "num_terms": 2500,
-        "max_articles": 1000,
+    workload_settings = {
+        "num_queries": 5,
+        "max_articles_sourced": 1000,
         "seed": 42,
     }
 
-    print(f"Generating {query_settings['num_terms']} search terms...")
+    n = workload_settings['num_queries']
+
+    print(f"Generating {n} search terms...")
     start = time.monotonic()
-    search_terms = generate_queries(pg, **query_settings)
+    search_terms = generate_search_terms(pg, **workload_settings)
     end = time.monotonic()
     print(f"Generated search terms in {end - start:.2f}s")
 
-    for i, term in enumerate(search_terms):
-        bench = measure_query(term, runners)
-        bench["index"] = i
-        print(json.dumps(bench, indent=2 if IS_VERBOSE else None), flush=True)
+    # TODO: Restructure so we can send many queries at once
+    # Workload = collection of queries
+    # Record time for each query and time in total
+    # Can calc avg latency, throughput, 99% percentile.
+    # Long-running allows us to measure memory usage, CPU usage, L3 cache misses, etc.
+    # Maybe look into using perf to hook onto a running process.
+
+    bench = {
+        "workload": workload_settings,
+        "runners": {},
+        "search_terms": search_terms,
+        "errors": []
+    }
+
+    for name, runner in runners:
+        out = []
+
+        runner_start = time.monotonic_ns()
+        for i, term in enumerate(bench["search_terms"]):
+            if i % 10 == 0:
+                print(f"\rProgress for {name}: query {i}/{n}...", end="")
+
+            try:
+                query_bench = measure_query(i, term, runner)
+                out.append(query_bench)
+            except Exception as e:
+                print(f"\nError running query {i}: {e}")
+                bench["errors"].append({
+                    "runner": name,
+                    "query_index": i,
+                    "error": str(e)
+                })
+        runner_end = time.monotonic_ns()
+
+        bench["runners"][name] = {
+            "total_elapsed_ms": (runner_end - runner_start) * 1e-6,
+            "queries": out
+        }
+
+        print(f"\rProgress for {name}: query {n}/{n}...")
+
+    with open("bench.json", "w") as bench_file:
+        bench_file.write(json.dumps(bench, indent=2))
