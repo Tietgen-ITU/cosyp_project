@@ -61,22 +61,13 @@ def query_elasticsearch(es, term):
     return res
 
 
-if __name__ == "__main__":
-    pg, es = connect()
-
+def run_configuration(pg, es, out_dir, configuration):
     runners = [
         ('postgres', lambda term: query_postgres(pg, term)),
         ('elasticsearch', lambda term: query_elasticsearch(es, term))
     ]
 
-    workload_settings = {
-        "num_queries": 5,
-        "max_articles_sourced": 1000,
-        "seed": 42,
-        "repetition": 1
-    }
-
-    n = workload_settings['num_queries']
+    n = configuration['num_queries']
 
     print(f"Generating {n} search terms...")
     start = time.monotonic()
@@ -84,8 +75,8 @@ if __name__ == "__main__":
     search_terms = generate_search_terms(
         pg,
         num_queries=n,
-        max_articles_sourced=workload_settings['max_articles_sourced'],
-        seed=workload_settings['seed'])
+        max_articles_sourced=configuration['max_articles_sourced'],
+        seed=configuration['seed'])
 
     end = time.monotonic()
     print(f"Generated search terms in {end - start:.2f}s")
@@ -96,7 +87,7 @@ if __name__ == "__main__":
     # Maybe look into using perf to hook onto a running process.
 
     bench = {
-        "workload": workload_settings,
+        "configuration": configuration,
         "runners": {},
         "search_terms": search_terms,
         "errors": []
@@ -129,16 +120,32 @@ if __name__ == "__main__":
 
         print(f"\rProgress for {name}: query {n}/{n}...")
 
-    folder_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    BENCH_DIR = f"benches/{folder_name}"
-    if not os.path.exists(BENCH_DIR):
-        os.makedirs(BENCH_DIR)
-
-    workload_hash = hashlib.md5(json.dumps(
-        workload_settings).encode()).hexdigest()
-    filename = f"{BENCH_DIR}/bench-{workload_hash}.json"
+    configuration_hash = hashlib.md5(json.dumps(
+        configuration).encode()).hexdigest()
+    filename = f"{out_dir}/bench-{configuration_hash}.json"
 
     print(f"Writing benchmark to {filename}")
 
     with open(filename, "w") as bench_file:
         bench_file.write(json.dumps(bench, indent=2))
+
+
+if __name__ == "__main__":
+    pg, es = connect()
+
+    folder_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    BENCH_DIR = f"benches/{folder_name}"
+    if not os.path.exists(BENCH_DIR):
+        os.makedirs(BENCH_DIR)
+
+    configurations = [
+        {
+            "num_queries": 500,
+            "max_articles_sourced": 1000,
+            "seed": 42,
+            "repetition": 1
+        }
+    ]
+
+    for configuration in configurations:
+        run_configuration(pg, es, BENCH_DIR, configuration)
