@@ -3,7 +3,7 @@ import random
 from itertools import cycle
 
 
-def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, seed=None):
+def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_words=(1, 6), seed=None):
     random.seed(seed)
 
     random_query = f"""
@@ -29,6 +29,8 @@ def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, seed=N
 
     search_terms = set()
 
+    min_words, max_words = num_words
+
     while len(search_terms) < num_queries:
         _, body = next(articles_iter)
 
@@ -38,8 +40,11 @@ def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, seed=N
         parts = [x for x in normalised.split() if len(x) >
                  1 and x not in banned]
 
-        length = min(random.randint(1, 6), len(parts))
-        start_index = random.randint(0, len(parts) - length)
+        length = random.randint(min_words, max_words)
+        start_index = random.randint(0, len(parts))
+
+        if start_index + length > len(parts):
+            continue
 
         search_term = " ".join(parts[start_index:start_index + length])
 

@@ -193,14 +193,18 @@ if __name__ == "__main__":
     if not os.path.exists(BENCH_DIR):
         os.makedirs(BENCH_DIR)
 
-    configurations = [
-        {
+
+    configurations = []
+
+    for interval in [(6, 6), (1,1), (25, 25)]:
+        configurations.append({
             "num_queries": 500,
+            "num_words": interval,
             "max_articles_sourced": 1000,
             "seed": 42,
             "repetition": 1
-        }
-    ]
+        })
 
     for configuration in configurations:
+        print(f"Running configuration: {configuration}")
         run_configuration(pg, es, BENCH_DIR, configuration)
