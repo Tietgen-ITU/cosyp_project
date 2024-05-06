@@ -6,6 +6,7 @@ import sys
 import os
 import json
 import hashlib
+from datetime import datetime
 
 
 LIMIT = 5
@@ -72,13 +73,20 @@ if __name__ == "__main__":
         "num_queries": 5,
         "max_articles_sourced": 1000,
         "seed": 42,
+        "repetition": 1
     }
 
     n = workload_settings['num_queries']
 
     print(f"Generating {n} search terms...")
     start = time.monotonic()
-    search_terms = generate_search_terms(pg, **workload_settings)
+
+    search_terms = generate_search_terms(
+        pg,
+        num_queries=n,
+        max_articles_sourced=workload_settings['max_articles_sourced'],
+        seed=workload_settings['seed'])
+
     end = time.monotonic()
     print(f"Generated search terms in {end - start:.2f}s")
 
@@ -121,12 +129,13 @@ if __name__ == "__main__":
 
         print(f"\rProgress for {name}: query {n}/{n}...")
 
-
-    BENCH_DIR = "benches"
+    folder_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    BENCH_DIR = f"benches/{folder_name}"
     if not os.path.exists(BENCH_DIR):
         os.makedirs(BENCH_DIR)
 
-    workload_hash = hashlib.md5(json.dumps(workload_settings).encode()).hexdigest()
+    workload_hash = hashlib.md5(json.dumps(
+        workload_settings).encode()).hexdigest()
     filename = f"{BENCH_DIR}/bench-{workload_hash}.json"
 
     print(f"Writing benchmark to {filename}")
