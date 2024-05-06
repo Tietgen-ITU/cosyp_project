@@ -196,10 +196,12 @@ if __name__ == "__main__":
 
     configurations = []
 
-    for interval in [(6, 6), (1,1), (25, 25)]:
+    num_words = [1, 2, 4, 8, 16, 32, 64, 128]
+
+    for nw in num_words:
         configurations.append({
             "num_queries": 500,
-            "num_words": interval,
+            "num_words": (nw, nw),
             "max_articles_sourced": 1000,
             "seed": 42,
             "repetition": 1
