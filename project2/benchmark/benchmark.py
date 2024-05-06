@@ -3,7 +3,9 @@ import time
 from elasticsearch import Elasticsearch
 from generate_queries import generate_search_terms
 import sys
+import os
 import json
+import hashlib
 
 
 LIMIT = 5
@@ -81,8 +83,6 @@ if __name__ == "__main__":
     print(f"Generated search terms in {end - start:.2f}s")
 
     # TODO: Restructure so we can send many queries at once
-    # Workload = collection of queries
-    # Record time for each query and time in total
     # Can calc avg latency, throughput, 99% percentile.
     # Long-running allows us to measure memory usage, CPU usage, L3 cache misses, etc.
     # Maybe look into using perf to hook onto a running process.
@@ -121,5 +121,15 @@ if __name__ == "__main__":
 
         print(f"\rProgress for {name}: query {n}/{n}...")
 
-    with open("bench.json", "w") as bench_file:
+
+    BENCH_DIR = "benches"
+    if not os.path.exists(BENCH_DIR):
+        os.makedirs(BENCH_DIR)
+
+    workload_hash = hashlib.md5(json.dumps(workload_settings).encode()).hexdigest()
+    filename = f"{BENCH_DIR}/bench-{workload_hash}.json"
+
+    print(f"Writing benchmark to {filename}")
+
+    with open(filename, "w") as bench_file:
         bench_file.write(json.dumps(bench, indent=2))
