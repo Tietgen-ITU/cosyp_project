@@ -7,6 +7,8 @@ import os
 import json
 import hashlib
 from datetime import datetime
+import docker
+from multiprocessing import Process, Queue
 
 
 LIMIT = 5
@@ -61,10 +63,53 @@ def query_elasticsearch(es, term):
     return res
 
 
+POSTGRES_NAME = 'postgres'
+ELASTICSEARCH_NAME = 'elasticsearch'
+
+
+def measure_container_stats(name, queue):
+    docker_client = docker.from_env()
+
+    containers = {}
+    containers[POSTGRES_NAME] = "cosyp-postgres"
+    containers[ELASTICSEARCH_NAME] = "cosyp-elastic"
+
+    container = docker_client.containers.get(containers[name])
+
+    for stats in container.stats(decode=True):
+        try:
+            mem_bytes_used = stats["memory_stats"]["usage"]
+            mem_bytes_avail = stats["memory_stats"]["limit"]
+            mem_gb_used = round(mem_bytes_used / (1024*1024*1024), 1) 
+            mem_gb_avail = round(mem_bytes_avail / (1024*1024*1024), 1) 
+
+            cpu_usage = (stats['cpu_stats']['cpu_usage']['total_usage']
+                         - stats['precpu_stats']['cpu_usage']['total_usage'])
+            cpu_system = (stats['cpu_stats']['system_cpu_usage']                    
+                          - stats['precpu_stats']['system_cpu_usage'])
+            num_cpus = stats['cpu_stats']["online_cpus"]
+            cpu_perc = round((cpu_usage / cpu_system) * num_cpus * 100)
+            cpu_max_perc = num_cpus * 100
+
+            queue.put({
+                "mem_gb_used": mem_gb_used,
+                "mem_gb_avail": mem_gb_avail,
+                "cpu_perc": cpu_perc,
+                "cpu_max_perc": cpu_max_perc
+            })
+        except Exception as e:
+            pass
+
+
+def drain_queue(q):
+    q.put(None)
+    return list(iter(lambda: q.get(timeout=0.00001), None))
+
+
 def run_configuration(pg, es, out_dir, configuration):
     runners = [
-        ('postgres', lambda term: query_postgres(pg, term)),
-        ('elasticsearch', lambda term: query_elasticsearch(es, term))
+        (POSTGRES_NAME, lambda term: query_postgres(pg, term)),
+        (ELASTICSEARCH_NAME, lambda term: query_elasticsearch(es, term))
     ]
 
     n = configuration['num_queries']
@@ -75,6 +120,7 @@ def run_configuration(pg, es, out_dir, configuration):
     search_terms = generate_search_terms(
         pg,
         num_queries=n,
+        num_words=configuration['num_words'],
         max_articles_sourced=configuration['max_articles_sourced'],
         seed=configuration['seed'])
 
@@ -96,6 +142,10 @@ def run_configuration(pg, es, out_dir, configuration):
     for name, runner in runners:
         out = []
 
+        queue = Queue()
+        p = Process(target=measure_container_stats, args=(name, queue))
+        p.start()
+
         runner_start = time.monotonic_ns()
         for i, term in enumerate(bench["search_terms"]):
             if i % 10 == 0:
@@ -113,12 +163,17 @@ def run_configuration(pg, es, out_dir, configuration):
                 })
         runner_end = time.monotonic_ns()
 
+        print(f"\rProgress for {name}: query {n}/{n}...")
+
+        p.terminate()
+
+        usage_stats = drain_queue(queue)
+
         bench["runners"][name] = {
             "total_elapsed_ms": (runner_end - runner_start) * 1e-6,
-            "queries": out
+            "queries": out,
+            "stats": usage_stats
         }
-
-        print(f"\rProgress for {name}: query {n}/{n}...")
 
     configuration_hash = hashlib.md5(json.dumps(
         configuration).encode()).hexdigest()
