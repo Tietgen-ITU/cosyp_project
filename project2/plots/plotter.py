@@ -1,3 +1,4 @@
+from matplotlib.axes import mticker
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 from itertools import groupby
@@ -70,14 +71,20 @@ def plot(configurations: list[Configuration]):
     configurations.sort(key=lambda x: x.config()["num_words"])
 
     for i, runner in enumerate(runners):
+
         xs = [c.config()["num_words"][0] for c in configurations]
         ys = [c.metrics(runner).throughput for c in configurations]
         marker, facecolor = MARKERS[i]
 
         plt.plot(xs, ys, f'-{marker}', markerfacecolor=facecolor, label=runner)
 
+    ax = plt.gca()
+    ax.set_xscale('log', base=2)
+    ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
+
     plt.xlabel("Number of words in search term")
     plt.ylabel("Throughput (queries/second)")
+    plt.grid()
     plt.legend()
 
     save_plot(f"throughput")
