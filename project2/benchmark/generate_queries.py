@@ -48,6 +48,6 @@ def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_wo
 
         search_term = " ".join(parts[start_index:start_index + length])
 
-        search_terms.add(search_term)
+        search_terms.add(search_term.lower())
 
     return list(search_terms)

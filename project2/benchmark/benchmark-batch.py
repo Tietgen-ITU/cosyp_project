@@ -18,7 +18,7 @@ IS_VERBOSE = "-v" in sys.argv
 def connect():
     con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:5049/cosyp")
     pg = con.cursor()
-    es = Elasticsearch("http://localhost:9200")
+    es = Elasticsearch("http://localhost:9200", request_timeout=100000)
     return pg, es
 
 
@@ -33,16 +33,18 @@ def measure_query(id, search_term, runner):
     }
 
 
-def query_postgres(cur, term):
-    query = f"""
-        SELECT title, ts_rank(search_vector, plainto_tsquery('english', %(term)s)) as rank
+def query_postgres(cur, terms: list[str]):
+    mk_query = lambda term: f"""
+        SELECT title, ts_rank(search_vector, plainto_tsquery('english', '{term}')) as rank
         FROM articles
-        WHERE search_vector @@ plainto_tsquery('english', %(term)s)
+        WHERE search_vector @@ plainto_tsquery('english', '{term}')
         ORDER BY rank DESC
         LIMIT {LIMIT};
     """
 
-    cur.execute(query, {"term": term})
+    query = '\n'.join(mk_query(term) for term in terms)
+
+    cur.execute(query)
     results = cur.fetchall()
 
     # print(f"{i}) Postgres results for '{term}'")
@@ -52,9 +54,22 @@ def query_postgres(cur, term):
     return results
 
 
-def query_elasticsearch(es, term):
-    res = es.search(index="articles", query={
-                    'match': {'body': term}}, fields=["title"], source=False, size=LIMIT)
+def query_elasticsearch(es: Elasticsearch, terms: list[str]):
+    searches = []
+
+    for term in terms:
+        searches.append({
+            "index": "articles",
+        })
+        searches.append( {
+            "query": {
+                'match': {'body': term}
+            },
+            '_source': False,
+            'size': LIMIT 
+        })
+
+    res = es.msearch(index="articles", searches=searches)
 
     # print(f"{i}) Elasticsearch results for '{term}'")
     # for hit in res['hits']['hits']:
@@ -106,10 +121,12 @@ def drain_queue(q):
     return list(iter(lambda: q.get(timeout=0.00001), None))
 
 
+
+
 def run_configuration(pg, es, out_dir, configuration):
     runners = [
+        (ELASTICSEARCH_NAME, lambda terms: query_elasticsearch(es, terms)),
         (POSTGRES_NAME, lambda term: query_postgres(pg, term)),
-        (ELASTICSEARCH_NAME, lambda term: query_elasticsearch(es, term))
     ]
 
     n = configuration['num_queries']
@@ -140,40 +157,33 @@ def run_configuration(pg, es, out_dir, configuration):
     }
 
     for name, runner in runners:
-        out = []
-
-        # queue = Queue()
-        # p = Process(target=measure_container_stats, args=(name, queue))
-        # p.start()
+        queue = Queue()
+        p = Process(target=measure_container_stats, args=(name, queue))
+        p.start()
 
         runner_start = time.monotonic_ns()
-        for i, term in enumerate(bench["search_terms"]):
-            if i % 10 == 0:
-                print(f"\rProgress for {name}: query {i}/{n}...", end="")
-
-            try:
-                query_bench = measure_query(i, term, runner)
-                out.append(query_bench)
-            except Exception as e:
-                print(f"\nError running query {i}: {e}")
-                bench["errors"].append({
-                    "runner": name,
-                    "query_index": i,
-                    "error": str(e)
-                })
+        runner(search_terms)
         runner_end = time.monotonic_ns()
 
-        print(f"\rProgress for {name}: query {n}/{n}...")
+        p.terminate()
+        try:
+            usage_stats = drain_queue(queue)
+        except:
+            usage_stats = []
 
-        # p.terminate()
-
-        # usage_stats = drain_queue(queue)
-
+        timed = (runner_end - runner_start) * 1e-6
         bench["runners"][name] = {
-            "total_elapsed_ms": (runner_end - runner_start) * 1e-6,
-            "queries": out,
-            # "stats": usage_stats
+            "total_elapsed_ms": timed,
+            "queries": [
+                {
+                    "id": 0,
+                    "elapsed_ms": timed
+                }
+            ],
+            "stats": usage_stats
         }
+
+        print(name, bench["runners"][name]["total_elapsed_ms"])
 
     configuration_hash = hashlib.md5(json.dumps(
         configuration).encode()).hexdigest()

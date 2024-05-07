@@ -20,13 +20,16 @@ class Configuration:
     def config(self):
         return self.data["configuration"]
 
+    def latencies(self, runner: str):
+        return [q["elapsed_ms"] for q in self.data["runners"][runner]["queries"]]
+
     def metrics(self, runner: str):
-        all_latencies = [q["elapsed_ms"]
-                         for q in self.data["runners"][runner]["queries"]]
+        all_latencies = self.latencies(runner)
+        n = self.config()["num_queries"]
         avg_latency = sum(all_latencies) / len(all_latencies)
         percentile_99 = sorted(all_latencies)[int(len(all_latencies) * 0.99)]
         percentile_1 = sorted(all_latencies)[int(len(all_latencies) * 0.01)]
-        throughput = len(all_latencies) / \
+        throughput = n / \
             (self.data["runners"][runner]["total_elapsed_ms"] / 1000)
         return Metrics(avg_latency, percentile_99, percentile_1, throughput)
 
@@ -40,10 +43,9 @@ class Metrics:
 
 
 def save_plot(name):
-    plt.show()
-    # format = "png"
-    # plt.savefig(f"plot_out/{format}/{name}.{format}",
-    #             format=format, bbox_inches="tight")
+    format = "png"
+    plt.savefig(f"plot_out/{format}/{name}.{format}",
+                format=format, bbox_inches="tight")
 
 
 MARKERS = [('*', None), ('s', None), ('|', None),
@@ -63,7 +65,7 @@ def read_data(folder):
     return configs
 
 
-def plot(configurations: list[Configuration]):
+def plot_throughput(configurations: list[Configuration]):
     plt.figure(figsize=(13, 5))
 
     runners = ["postgres", "elasticsearch"]
@@ -90,6 +92,30 @@ def plot(configurations: list[Configuration]):
     save_plot(f"throughput")
 
 
+def plot_variance(configurations: list[Configuration]):
+    plt.figure(figsize=(13, 5))
+
+    runners = ["postgres", "elasticsearch"]
+
+    configurations.sort(key=lambda x: x.config()["num_words"])
+
+    for i, runner in enumerate(runners):
+        plt.subplot(1, len(runners), i + 1)
+
+        xs = [c.config()["num_words"][0] for c in configurations]
+        ys = [c.latencies(runner) for c in configurations]
+
+        plt.boxplot(ys, labels=xs, showmeans=True)
+
+        plt.title(f"Latencies for {runner}")
+        plt.xlabel("Number of words in search term")
+        plt.ylabel("Latency (ms)")
+        plt.grid()
+
+
+    save_plot(f"variance")
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python plotter.py <dir path>")
@@ -100,5 +126,5 @@ if __name__ == "__main__":
     for c in configurations:
         print(c.config())
 
-    print(f"Plotting throughput")
-    plot(configurations)
+    plot_throughput(configurations)
+    plot_variance(configurations)
