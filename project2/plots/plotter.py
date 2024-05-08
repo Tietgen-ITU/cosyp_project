@@ -65,7 +65,6 @@ def read_data(folder):
 
 
 def plot_throughput(configurations: list[Configuration]):
-    plt.figure(figsize=(13, 5))
 
     strategies = ["batch", "single"]
     runners = ["postgres", "elasticsearch"]
@@ -73,6 +72,8 @@ def plot_throughput(configurations: list[Configuration]):
     configurations.sort(key=lambda x: x.config()["num_words"])
 
     for strategy in strategies:
+        plt.figure(figsize=(13, 5))
+
         for i, runner in enumerate(runners):
             confs = [c for c in configurations if c.config()["strategy"] == strategy]
 
@@ -80,20 +81,19 @@ def plot_throughput(configurations: list[Configuration]):
             ys = [c.metrics(runner).throughput for c in confs]
             marker, facecolor = MARKERS[i]
 
-            label = f"{runner} ({strategy})"
+            plt.plot(xs, ys, f'-{marker}', markerfacecolor=facecolor, label=runner)
 
-            plt.plot(xs, ys, f'-{marker}', markerfacecolor=facecolor, label=label)
+        ax = plt.gca()
+        ax.set_xscale('log', base=2)
+        ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
 
-    ax = plt.gca()
-    ax.set_xscale('log', base=2)
-    ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
+        plt.xlabel("Number of words in search term")
+        plt.ylabel("Throughput (queries/second)")
+        plt.grid()
+        plt.title(f"Throughput for different query sizes ({strategy})")
+        plt.legend()
 
-    plt.xlabel("Number of words in search term")
-    plt.ylabel("Throughput (queries/second)")
-    plt.grid()
-    plt.legend()
-
-    save_plot(f"throughput")
+        save_plot(f"throughput-{strategy}")
 
 
 def plot_variance(configurations: list[Configuration]):
