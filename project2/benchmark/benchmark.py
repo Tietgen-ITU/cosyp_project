@@ -150,9 +150,11 @@ def run_configuration(pg, es, out_dir, configuration):
     for name, runner in runners:
         out = []
 
-        # queue = Queue()
-        # p = Process(target=measure_container_stats, args=(name, queue))
-        # p.start()
+        p, queue = None, None
+        if configuration['with_system_stats']:
+            queue = Queue()
+            p = Process(target=measure_container_stats, args=(name, queue))
+            p.start()
 
         runner_start = time.monotonic_ns()
 
@@ -173,14 +175,20 @@ def run_configuration(pg, es, out_dir, configuration):
 
         runner_end = time.monotonic_ns()
 
-        # p.terminate()
+        if configuration['with_system_stats']:
+            p.terminate()
 
-        # usage_stats = drain_queue(queue)
+        usage_stats = []
+        try:
+            if configuration['with_system_stats']:
+                usage_stats = drain_queue(queue)
+        except Exception as e:
+            print(f"Failed to get usage stats for {name}: {e}")
 
         bench["runners"][name] = {
             "total_elapsed_ms": (runner_end - runner_start) * 1e-6,
             "queries": out,
-            # "stats": usage_stats
+            "stats": usage_stats
         }
 
     configuration_hash = hashlib.md5(json.dumps(
@@ -208,7 +216,9 @@ if __name__ == "__main__":
     strategies = [STRATEGY_BATCH, STRATEGY_SINGLE]
     repetitions = 1
     SEED = 1337
-    num_queries = [25]
+    num_queries = [50]
+
+    with_system_stats = False
 
     for repetition in range(repetitions):
         for nq in num_queries:
@@ -220,7 +230,8 @@ if __name__ == "__main__":
                         "num_words": nw,
                         "max_articles_sourced": 1000,
                         "seed": SEED,
-                        "repetition": repetition
+                        "repetition": repetition,
+                        "with_system_stats": with_system_stats,
                     })
 
     for configuration in configurations:
