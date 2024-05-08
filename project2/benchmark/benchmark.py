@@ -2,7 +2,6 @@ import psycopg2
 import time
 from elasticsearch import Elasticsearch
 from generate_queries import generate_search_terms
-import sys
 import os
 import json
 import hashlib
@@ -12,10 +11,13 @@ from multiprocessing import Process, Queue
 
 
 LIMIT = 5
-IS_VERBOSE = "-v" in sys.argv
 
 STRATEGY_BATCH = "batch"
 STRATEGY_SINGLE = "single"
+
+POSTGRES_NAME = 'postgres'
+ELASTICSEARCH_NAME = 'elasticsearch'
+
 
 def connect():
     con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:5049/cosyp")
@@ -65,20 +67,16 @@ def query_elasticsearch(es, terms: list[str]):
             searches.append({
                 "index": "articles",
             })
-            searches.append( {
+            searches.append({
                 "query": {
                     'match': {'body': term}
                 },
                 '_source': False,
-                'size': LIMIT 
+                'size': LIMIT
             })
         res = es.msearch(index="articles", searches=searches)
 
     return res
-
-
-POSTGRES_NAME = 'postgres'
-ELASTICSEARCH_NAME = 'elasticsearch'
 
 
 def measure_container_stats(name, queue):
@@ -169,7 +167,8 @@ def run_configuration(pg, es, out_dir, configuration):
             print(f"\rProgress for {name}: query {n}/{n}...")
         elif configuration['strategy'] == STRATEGY_BATCH:
             print(f"\rProgress for {name}: query 0/1...", end="")
-            query_bench = measure_query(list(range(0, n+1)), bench["search_terms"], runner)
+            query_bench = measure_query(
+                list(range(0, n+1)), bench["search_terms"], runner)
             out.append(query_bench)
             print(f"\rProgress for {name}: query 1/1...")
 
