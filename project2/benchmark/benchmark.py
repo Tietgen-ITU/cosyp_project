@@ -35,9 +35,9 @@ def measure_query(id, search_term, runner):
 
 def query_postgres(cur, term):
     query = f"""
-        SELECT title, ts_rank(search_vector, plainto_tsquery('english', %(term)s)) as rank
-        FROM articles
-        WHERE search_vector @@ plainto_tsquery('english', %(term)s)
+        SELECT title, ts_rank(search_vector, query) as rank
+        FROM articles, plainto_tsquery('english', %(term)s) query
+        WHERE query @@ search_vector
         ORDER BY rank DESC
         LIMIT {LIMIT};
     """
