@@ -2,7 +2,6 @@ import psycopg2
 import time
 from elasticsearch import Elasticsearch
 from generate_queries import generate_search_terms
-import sys
 import os
 import json
 import hashlib
@@ -12,7 +11,12 @@ from multiprocessing import Process, Queue
 
 
 LIMIT = 5
-IS_VERBOSE = "-v" in sys.argv
+
+STRATEGY_BATCH = "batch"
+STRATEGY_SINGLE = "single"
+
+POSTGRES_NAME = 'postgres'
+ELASTICSEARCH_NAME = 'elasticsearch'
 
 
 def connect():
@@ -22,9 +26,9 @@ def connect():
     return pg, es
 
 
-def measure_query(id, search_term, runner):
+def measure_query(id, search_terms, runner):
     start = time.monotonic_ns()
-    runner(search_term)
+    runner(search_terms)
     end = time.monotonic_ns()
 
     return {
@@ -33,38 +37,46 @@ def measure_query(id, search_term, runner):
     }
 
 
-def query_postgres(cur, term):
-    query = f"""
-        SELECT title, ts_rank(search_vector, plainto_tsquery('english', %(term)s)) as rank
-        FROM articles
-        WHERE search_vector @@ plainto_tsquery('english', %(term)s)
+def make_postgres_query(term):
+    return f"""
+        SELECT title, ts_rank(search_vector, query) as rank
+        FROM articles, plainto_tsquery('english', '{term}') query
+        WHERE query @@ search_vector
         ORDER BY rank DESC
         LIMIT {LIMIT};
     """
 
-    cur.execute(query, {"term": term})
-    results = cur.fetchall()
 
-    # print(f"{i}) Postgres results for '{term}'")
-    # for title, rank in results:
-    #     print("  ", f"{rank:05} | {title}")
+def query_postgres(cur, terms: list[str]):
+    query = '\n'.join(make_postgres_query(term) for term in terms)
+
+    cur.execute(query)
+    results = cur.fetchall()
 
     return results
 
 
-def query_elasticsearch(es, term):
-    res = es.search(index="articles", query={
-                    'match': {'body': term}}, fields=["title"], source=False, size=LIMIT)
-
-    # print(f"{i}) Elasticsearch results for '{term}'")
-    # for hit in res['hits']['hits']:
-    #     print("  ", f'{hit["_score"]:05}', "|", hit['fields']['title'][0])
+def query_elasticsearch(es, terms: list[str]):
+    if len(terms) == 1:
+        term = terms[0]
+        res = es.search(index="articles", query={
+                        'match': {'body': term}}, fields=["title"], source=False, size=LIMIT)
+    else:
+        searches = []
+        for term in terms:
+            searches.append({
+                "index": "articles",
+            })
+            searches.append({
+                "query": {
+                    'match': {'body': term}
+                },
+                '_source': False,
+                'size': LIMIT
+            })
+        res = es.msearch(index="articles", searches=searches)
 
     return res
-
-
-POSTGRES_NAME = 'postgres'
-ELASTICSEARCH_NAME = 'elasticsearch'
 
 
 def measure_container_stats(name, queue):
@@ -108,8 +120,8 @@ def drain_queue(q):
 
 def run_configuration(pg, es, out_dir, configuration):
     runners = [
-        (POSTGRES_NAME, lambda term: query_postgres(pg, term)),
-        (ELASTICSEARCH_NAME, lambda term: query_elasticsearch(es, term))
+        (POSTGRES_NAME, lambda terms: query_postgres(pg, terms)),
+        (ELASTICSEARCH_NAME, lambda terms: query_elasticsearch(es, terms))
     ]
 
     n = configuration['num_queries']
@@ -127,52 +139,55 @@ def run_configuration(pg, es, out_dir, configuration):
     end = time.monotonic()
     print(f"Generated search terms in {end - start:.2f}s")
 
-    # TODO: Restructure so we can send many queries at once
-    # Can calc avg latency, throughput, 99% percentile.
-    # Long-running allows us to measure memory usage, CPU usage, L3 cache misses, etc.
-    # Maybe look into using perf to hook onto a running process.
-
     bench = {
         "configuration": configuration,
         "runners": {},
         "search_terms": search_terms,
-        "errors": []
     }
 
     for name, runner in runners:
         out = []
 
-        # queue = Queue()
-        # p = Process(target=measure_container_stats, args=(name, queue))
-        # p.start()
+        p, queue = None, None
+        if configuration['with_system_stats']:
+            queue = Queue()
+            p = Process(target=measure_container_stats, args=(name, queue))
+            p.start()
 
         runner_start = time.monotonic_ns()
-        for i, term in enumerate(bench["search_terms"]):
-            if i % 10 == 0:
-                print(f"\rProgress for {name}: query {i}/{n}...", end="")
 
-            try:
-                query_bench = measure_query(i, term, runner)
+        if configuration['strategy'] == STRATEGY_SINGLE:
+            for i, term in enumerate(bench["search_terms"]):
+                if i % 10 == 0:
+                    print(f"\rProgress for {name}: query {i}/{n}...", end="")
+
+                query_bench = measure_query(i, [term], runner)
                 out.append(query_bench)
-            except Exception as e:
-                print(f"\nError running query {i}: {e}")
-                bench["errors"].append({
-                    "runner": name,
-                    "query_index": i,
-                    "error": str(e)
-                })
+
+            print(f"\rProgress for {name}: query {n}/{n}...")
+        elif configuration['strategy'] == STRATEGY_BATCH:
+            print(f"\rProgress for {name}: query 0/1...", end="")
+            query_bench = measure_query(
+                list(range(0, n+1)), bench["search_terms"], runner)
+            out.append(query_bench)
+            print(f"\rProgress for {name}: query 1/1...")
+
         runner_end = time.monotonic_ns()
 
-        print(f"\rProgress for {name}: query {n}/{n}...")
+        if configuration['with_system_stats']:
+            p.terminate()
 
-        # p.terminate()
-
-        # usage_stats = drain_queue(queue)
+        usage_stats = []
+        try:
+            if configuration['with_system_stats']:
+                usage_stats = drain_queue(queue)
+        except Exception as e:
+            print(f"Failed to get usage stats for {name}: {e}")
 
         bench["runners"][name] = {
             "total_elapsed_ms": (runner_end - runner_start) * 1e-6,
             "queries": out,
-            # "stats": usage_stats
+            "stats": usage_stats
         }
 
     configuration_hash = hashlib.md5(json.dumps(
@@ -197,16 +212,28 @@ if __name__ == "__main__":
 
     num_words = [(1, 1), (2, 2), (4, 4), (8, 8), (16, 16),
                  (32, 32), (64, 64), (128, 128)]
+    strategies = [STRATEGY_BATCH, STRATEGY_SINGLE]
+    repetitions = 1
+    SEED = 1337
+    num_queries = [50]
 
-    for nw in num_words:
-        configurations.append({
-            "num_queries": 500,
-            "num_words": nw,
-            "max_articles_sourced": 1000,
-            "seed": nw[0],
-            "repetition": 1
-        })
+    with_system_stats = False
+
+    for repetition in range(repetitions):
+        for nq in num_queries:
+            for strategy in strategies:
+                for nw in num_words:
+                    configurations.append({
+                        "num_queries": nq,
+                        "strategy": strategy,
+                        "num_words": nw,
+                        "max_articles_sourced": 1000,
+                        "seed": SEED,
+                        "repetition": repetition,
+                        "with_system_stats": with_system_stats,
+                    })
 
     for configuration in configurations:
         print(f"Running configuration: {configuration}")
         run_configuration(pg, es, BENCH_DIR, configuration)
+        print()

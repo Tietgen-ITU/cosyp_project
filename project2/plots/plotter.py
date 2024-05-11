@@ -1,7 +1,6 @@
 from matplotlib.axes import mticker
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
-from itertools import groupby
 import os
 import sys
 import json
@@ -66,54 +65,63 @@ def read_data(folder):
 
 
 def plot_throughput(configurations: list[Configuration]):
-    plt.figure(figsize=(13, 5))
 
+    strategies = ["batch", "single"]
     runners = ["postgres", "elasticsearch"]
 
     configurations.sort(key=lambda x: x.config()["num_words"])
 
-    for i, runner in enumerate(runners):
+    for strategy in strategies:
+        plt.figure(figsize=(13, 5))
 
-        xs = [c.config()["num_words"][0] for c in configurations]
-        ys = [c.metrics(runner).throughput for c in configurations]
-        marker, facecolor = MARKERS[i]
+        for i, runner in enumerate(runners):
+            confs = [c for c in configurations if c.config()["strategy"] == strategy]
 
-        plt.plot(xs, ys, f'-{marker}', markerfacecolor=facecolor, label=runner)
+            xs = [c.config()["num_words"][0] for c in confs]
+            ys = [c.metrics(runner).throughput for c in confs]
+            marker, facecolor = MARKERS[i]
 
-    ax = plt.gca()
-    ax.set_xscale('log', base=2)
-    ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
+            plt.plot(xs, ys, f'-{marker}', markerfacecolor=facecolor, label=runner)
 
-    plt.xlabel("Number of words in search term")
-    plt.ylabel("Throughput (queries/second)")
-    plt.grid()
-    plt.legend()
+        ax = plt.gca()
+        ax.set_xscale('log', base=2)
+        ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
 
-    save_plot(f"throughput")
+        plt.xlabel("Number of words in search term")
+        plt.ylabel("Throughput (queries/second)")
+        plt.grid()
+        plt.title(f"Throughput for different query sizes ({strategy})")
+        plt.legend()
+
+        save_plot(f"throughput-{strategy}")
 
 
 def plot_variance(configurations: list[Configuration]):
-    plt.figure(figsize=(13, 5))
 
     runners = ["postgres", "elasticsearch"]
+    strategies = ["single", "batch"]
 
     configurations.sort(key=lambda x: x.config()["num_words"])
 
-    for i, runner in enumerate(runners):
-        plt.subplot(1, len(runners), i + 1)
+    for strategy in strategies:
+        plt.figure(figsize=(13, 5))
 
-        xs = [c.config()["num_words"][0] for c in configurations]
-        ys = [c.latencies(runner) for c in configurations]
+        for i, runner in enumerate(runners):
+            plt.subplot(1, len(runners), i + 1)
 
-        plt.boxplot(ys, labels=xs, showmeans=True)
+            confs = [c for c in configurations if c.config()["strategy"] == strategy]
 
-        plt.title(f"Latencies for {runner}")
-        plt.xlabel("Number of words in search term")
-        plt.ylabel("Latency (ms)")
-        plt.grid()
+            xs = [c.config()["num_words"][0] for c in confs]
+            ys = [c.latencies(runner) for c in confs]
 
+            plt.boxplot(ys, labels=xs, showmeans=True)
 
-    save_plot(f"variance")
+            plt.title(f"Latencies for {runner} ({strategy})")
+            plt.xlabel("Number of words in search term")
+            plt.ylabel("Latency (ms)")
+            plt.grid()
+
+        save_plot(f"variance-{strategy}")
 
 
 if __name__ == "__main__":
