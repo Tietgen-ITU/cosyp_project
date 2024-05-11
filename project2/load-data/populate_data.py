@@ -5,6 +5,7 @@ import bz2
 import xml.etree.ElementTree as ET
 import psycopg2
 import sys
+from wikitextparser import parse
 from psycopg2.extras import execute_batch
 from typing import Union
 from elasticsearch import Elasticsearch
@@ -71,13 +72,17 @@ def load_articles_xml(file):
     def tag(x): return f"{{http://www.mediawiki.org/xml/export-0.10/}}{x}"
     def untag(x): return x.replace(
         "{http://www.mediawiki.org/xml/export-0.10/}", "")
-
     pages: list[Union[str, str]] = []
+
     for page in root.findall(tag("page")):
         title = page.find(tag('title')).text
         revision = page.find(tag('revision'))
-        text = revision.find(tag('text'))
-        pages.append((title, text.text))
+        text = revision.find(tag('text')).text
+        if text is None:
+            continue
+
+        parsed_text = parse(text).plain_text()
+        pages.append((title, parsed_text))
 
     print(f"Loaded {len(pages)} pages")
 
@@ -128,6 +133,7 @@ def insert_into_elasticsearch(pages: list[Union[str, str]]):
 
 def handle_data_loading():
 
+    # datadir_path = "project2/load-data/articles/decompressed/"
     datadir_path = "articles/decompressed/"
 
     loaddata = None # Declare loaddata function
