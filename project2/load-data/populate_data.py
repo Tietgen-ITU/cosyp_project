@@ -82,6 +82,7 @@ def load_articles_xml(file):
             continue
 
         parsed_text = parse(text).plain_text()
+        parsed_text = parsed_text.replace("#REDIRECT", "#REDIRECT ")
         pages.append((title, parsed_text))
 
     print(f"Loaded {len(pages)} pages")
@@ -144,7 +145,7 @@ def handle_data_loading():
         case "--elastic":
             loaddata = lambda pages: insert_into_elasticsearch(pages)
         case "--both":
-            loaddata = lambda pages: insert_into_postgres(pages); insert_into_elasticsearch(pages)
+            loaddata = lambda pages: (insert_into_postgres(pages), insert_into_elasticsearch(pages))
         case _:
             print("Invalid load category")
             sys.exit(1)
