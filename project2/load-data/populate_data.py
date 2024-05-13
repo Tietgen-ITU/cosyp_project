@@ -8,7 +8,7 @@ import sys
 from wikitextparser import parse
 from psycopg2.extras import execute_batch
 from typing import Union
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, helpers
 import time
 
 
@@ -72,7 +72,7 @@ def load_articles_xml(file):
     def tag(x): return f"{{http://www.mediawiki.org/xml/export-0.10/}}{x}"
     def untag(x): return x.replace(
         "{http://www.mediawiki.org/xml/export-0.10/}", "")
-    pages: list[Union[str, str]] = []
+    pages: list[dict[str, str]] = []
 
     for page in root.findall(tag("page")):
         title = page.find(tag('title')).text
@@ -83,20 +83,21 @@ def load_articles_xml(file):
 
         parsed_text = parse(text).plain_text()
         parsed_text = parsed_text.replace("#REDIRECT", "#REDIRECT ")
-        pages.append((title, parsed_text))
+
+        pages.append({"title": title, "body": parsed_text})
 
     print(f"Loaded {len(pages)} pages")
 
     return pages
 
 
-def insert_into_postgres(pages: list[Union[str, str]], port: str):
+def insert_into_postgres(pages: list[dict[str, str]], port: str):
     con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:" + port + "/cosyp")
     cur = con.cursor()
 
     print("Inserting pages into Postgres")
     execute_batch(
-        cur, "INSERT INTO articles (title, body, search_vector) VALUES (%s, %s, to_tsvector('english', body)", pages)
+        cur, "INSERT INTO articles (title, body, search_vector) VALUES (%(title)s, %(body)s, to_tsvector('english', %(body)s))", pages)
     con.commit()
     print("Inserted pages into Postgres")
 
@@ -114,19 +115,11 @@ def insert_into_postgres(pages: list[Union[str, str]], port: str):
     #   ORDER BY rank DESC;
 
 
-def insert_into_elasticsearch(pages: list[Union[str, str]], port: str):
+def insert_into_elasticsearch(pages: list[dict[str, str]], port: str):
     es = Elasticsearch("http://localhost:"+port)
 
     print("Indexing documents in Elasticsearch")
-
-    for i, page in enumerate(pages, start=1):
-        title, body = page
-        doc = {"title": title, "body": body}
-        es.index(index="articles", id=title, document=doc)
-
-        if i % 100 == 0 or i == 1:
-            print(f"\rIndexed {i} documents", end="")
-
+    helpers.bulk(es, pages, index="articles")
     print("\rIndexed documents in Elasticsearch")
 
     # Query:
@@ -174,11 +167,11 @@ def handle_data_loading():
     target_size = size_gb*1000000000
 
     files = [file for file in decompressed_dir if file.is_file()]
-    files.sort(key=lambda x: x.stat().st_size)
+    files.sort(key=lambda x: x.stat().st_size, reverse=True)
 
     for io_entry in files:
         if target_size < io_entry.stat().st_size:
-            break
+            continue
 
         target_size -= io_entry.stat().st_size
         pages = load_articles_xml(io_entry.path)
