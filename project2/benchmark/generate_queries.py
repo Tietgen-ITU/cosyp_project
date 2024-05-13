@@ -121,6 +121,15 @@ def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_wo
 
         search_term_score[search_term.lower()] = (search_term, article_score)
 
+    no_matches = []
+    for _ in range(num_queries):
+        parts = []
+        for _ in range(max(num_words)):
+            random_string = ''.join(random.choices(string.ascii_lowercase, k=16))
+            parts.append(random_string)
+        garbage_terms = random.sample(parts, random.randint(*num_words))
+        no_matches.append(' '.join(garbage_terms))
+
     print(f"\nDone generating search terms")
 
     sorted_search_terms = sorted(
@@ -138,6 +147,7 @@ def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_wo
         'in_many_articles': high_cardinality,
         'in_few_articles': low_cardinality,
         'random': random_queries,
+        'no_matches': no_matches,
     }
 
     current_cache[cache_key] = results
