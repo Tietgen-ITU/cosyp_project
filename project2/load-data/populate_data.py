@@ -183,6 +183,11 @@ def handle_plaintext():
     decompressed_dir = os.scandir(datadir_path)
 
     files = [file for file in decompressed_dir if file.is_file()]
+    num = int(sys.argv[2])
+
+    count = 0
+    iter_count = 11
+    number_of_skip_files = num*iter_count
 
     out_dir = os.path.join(ARTICLES_DIR, "plaintext")
 
@@ -190,6 +195,14 @@ def handle_plaintext():
         os.makedirs(out_dir)
 
     for io_entry in files:
+        if number_of_skip_files > 0:
+            number_of_skip_files -= 1
+            continue
+
+        if count >= iter_count:
+            continue
+
+        count += 1
         pages = load_articles_xml(io_entry.path)
 
         out_file = os.path.join(out_dir, io_entry.name + ".json")
