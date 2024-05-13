@@ -57,6 +57,7 @@ def save_plot(name):
     format = "png"
     plt.savefig(f"plot_out/{format}/{name}.{format}",
                 format=format, bbox_inches="tight")
+    plt.close()
 
 
 MARKERS = [('*', None), ('s', None), ('o', None),
@@ -245,7 +246,12 @@ if __name__ == "__main__":
     for c in configurations:
         print(c.config())
 
+    print("Plotting throughput...")
     plot_throughput(configurations)
+    print("Plotting throughput per query type...")
     plot_throughput_per_query_type(configurations)
+    print("Plotting variance...")
     plot_variance(configurations)
+    print("Plotting resource usage...")
     plot_resource_usage(configurations)
+    print("Done")
