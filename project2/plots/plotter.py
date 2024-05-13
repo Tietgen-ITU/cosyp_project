@@ -9,6 +9,11 @@ import matplotlib as mpl
 mpl.rcParams['figure.dpi'] = 600
 
 
+strategies = ["batch", "single"]
+runners = ["postgres", "elasticsearch"]
+query_types = ["in_many_articles", "in_few_articles", "random"]
+
+
 @dataclass
 class Configuration:
     data: dict
@@ -68,110 +73,106 @@ def read_data(folder):
 
 
 def plot_throughput(configurations: list[Configuration]):
-    strategies = ["batch", "single"]
-    runners = ["postgres", "elasticsearch"]
-
     configurations.sort(key=lambda x: x.config()["num_words"])
 
     for strategy in strategies:
-        plt.figure(figsize=(13, 5))
+        for qt in query_types:
+            plt.figure(figsize=(13, 5))
 
-        for i, runner in enumerate(runners):
-            confs = [c for c in configurations if c.config(
-            )["strategy"] == strategy and c.config()["query_type"] == "random"]
+            for i, runner in enumerate(runners):
+                confs = [c for c in configurations if c.config(
+                )["strategy"] == strategy and c.config()["query_type"] == qt]
 
-            xs = [c.config()["num_words"][0] for c in confs]
-            ys = [c.metrics(runner).throughput for c in confs]
-            marker, facecolor = MARKERS[i]
+                xs = [c.config()["num_words"][0] for c in confs]
+                ys = [c.metrics(runner).throughput for c in confs]
+                marker, facecolor = MARKERS[i]
 
-            plt.plot(xs, ys, f'-{marker}',
-                     markerfacecolor=facecolor, label=runner)
+                plt.plot(xs, ys, f'-{marker}',
+                         markerfacecolor=facecolor, label=runner)
 
-        ax = plt.gca()
-        ax.set_xscale('log', base=2)
-        ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
+            ax = plt.gca()
+            ax.set_xscale('log', base=2)
+            ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
 
-        plt.xlabel("Number of words in search term")
-        plt.ylabel("Throughput (queries/second)")
-        plt.grid()
-        plt.title(f"Throughput for different query sizes ({strategy})")
-        plt.legend()
+            plt.xlabel("Number of words in search term")
+            plt.ylabel("Throughput (queries/second)")
+            plt.grid()
+            plt.title(f"Throughput for different query sizes ({strategy}, {qt})")
+            plt.legend()
 
-        save_plot(f"throughput-{strategy}")
+            save_plot(f"throughput-{strategy}-{qt}")
 
 
 def plot_throughput_per_query_type(configurations: list[Configuration]):
-    runners = ["postgres", "elasticsearch"]
-    query_types = ["in_many_articles", "in_few_articles", "random"]
-
-    configurations.sort(key=lambda x: x.config()["num_words"])
-
-    min_y, max_y = 0, 0
-
-    plt.figure(figsize=(13, 5))
-    for i, runner in enumerate(runners):
-        plt.subplot(1, len(runners), i + 1)
-
-        for j, qt in enumerate(query_types):
-            confs = [c for c in configurations if c.config(
-            )["strategy"] == "batch" and c.config()["query_type"] == qt]
-
-            xs = [c.config()["num_words"][0] for c in confs]
-            ys = [c.metrics(runner).throughput for c in confs]
-            marker, facecolor = MARKERS[j]
-
-            min_y = min(min_y, min(ys))
-            max_y = max(max_y, max(ys))
-
-            plt.plot(xs, ys, f'-{marker}',
-                     markerfacecolor=facecolor, label=f"{qt}")
-
-        ax = plt.gca()
-        ax.set_xscale('log', base=2)
-        ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
-
-        plt.xlabel("Number of words in search term")
-        plt.ylabel("Throughput (queries/second)")
-        plt.grid()
-        plt.title(f"{runner} query throughput for different query sizes")
-        plt.legend()
-
-    for i, _ in enumerate(runners):
-        plt.subplot(1, len(runners), i + 1)
-        plt.ylim(0, max_y * 1.1)
-
-    save_plot(f"throughput-query-cardinality")
-
-
-def plot_variance(configurations: list[Configuration]):
-    runners = ["postgres", "elasticsearch"]
-    strategies = ["single", "batch"]
-
     configurations.sort(key=lambda x: x.config()["num_words"])
 
     for strategy in strategies:
-        plt.figure(figsize=(13, 5))
+        min_y, max_y = 0, 0
 
+        plt.figure(figsize=(13, 5))
         for i, runner in enumerate(runners):
             plt.subplot(1, len(runners), i + 1)
 
-            confs = [c for c in configurations if c.config()["strategy"]
-                     == strategy and c.config()["query_type"] == "in_many_articles"]
+            for j, qt in enumerate(query_types):
+                confs = [c for c in configurations if c.config(
+                )["strategy"] == strategy and c.config()["query_type"] == qt]
 
-            if not len(confs):
-                continue
+                xs = [c.config()["num_words"][0] for c in confs]
+                ys = [c.metrics(runner).throughput for c in confs]
+                marker, facecolor = MARKERS[j]
 
-            xs = [c.config()["num_words"][0] for c in confs]
-            ys = [c.latencies(runner) for c in confs]
+                min_y = min(min_y, min(ys))
+                max_y = max(max_y, max(ys))
 
-            plt.boxplot(ys, labels=xs, showmeans=True)
+                plt.plot(xs, ys, f'-{marker}',
+                         markerfacecolor=facecolor, label=f"{qt}")
 
-            plt.title(f"Latencies for {runner} ({strategy})")
+            ax = plt.gca()
+            ax.set_xscale('log', base=2)
+            ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
+
             plt.xlabel("Number of words in search term")
-            plt.ylabel("Latency (ms)")
+            plt.ylabel("Throughput (queries/second)")
             plt.grid()
+            plt.title(runner)
+            plt.legend()
 
-        save_plot(f"variance-{strategy}")
+        for i, _ in enumerate(runners):
+            plt.subplot(1, len(runners), i + 1)
+            plt.ylim(0, max_y * 1.1)
+
+        plt.suptitle(f"Throughput for different query types ({strategy})")
+
+        save_plot(f"throughput-query-cardinality-{strategy}")
+
+
+def plot_variance(configurations: list[Configuration]):
+    configurations.sort(key=lambda x: x.config()["num_words"])
+
+    for strategy in strategies:
+        for qt in query_types:
+            plt.figure(figsize=(13, 5))
+
+            for i, runner in enumerate(runners):
+                plt.subplot(1, len(runners), i + 1)
+
+                confs = [c for c in configurations if c.config()["strategy"]
+                         == strategy and c.config()["query_type"] == qt]
+
+                if not len(confs):
+                    continue
+
+                xs = [c.config()["num_words"][0] for c in confs]
+                ys = [c.latencies(runner) for c in confs]
+
+                plt.boxplot(ys, labels=xs, showmeans=True)
+
+                plt.title(f"Latencies for {runner} ({strategy}, {qt})")
+                plt.xlabel("Number of words in search term")
+                plt.ylabel("Latency (ms)")
+                plt.grid()
+
+            save_plot(f"variance-{strategy}-{qt}")
 
 
 if __name__ == "__main__":
