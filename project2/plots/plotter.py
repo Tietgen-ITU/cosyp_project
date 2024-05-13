@@ -4,6 +4,9 @@ from dataclasses import dataclass
 import os
 import sys
 import json
+import matplotlib as mpl
+
+mpl.rcParams['figure.dpi'] = 600
 
 
 @dataclass
@@ -47,8 +50,8 @@ def save_plot(name):
                 format=format, bbox_inches="tight")
 
 
-MARKERS = [('*', None), ('s', None), ('|', None),
-           ('x', None), ('s', 'none'), ('o', 'none')]
+MARKERS = [('*', None), ('s', None), ('o', None),
+           ('x', None), ('|', None), ('s', 'none')]
 
 
 def read_data(folder):
@@ -65,7 +68,6 @@ def read_data(folder):
 
 
 def plot_throughput(configurations: list[Configuration]):
-
     strategies = ["batch", "single"]
     runners = ["postgres", "elasticsearch"]
 
@@ -75,13 +77,15 @@ def plot_throughput(configurations: list[Configuration]):
         plt.figure(figsize=(13, 5))
 
         for i, runner in enumerate(runners):
-            confs = [c for c in configurations if c.config()["strategy"] == strategy]
+            confs = [c for c in configurations if c.config(
+            )["strategy"] == strategy and c.config()["query_type"] == "random"]
 
             xs = [c.config()["num_words"][0] for c in confs]
             ys = [c.metrics(runner).throughput for c in confs]
             marker, facecolor = MARKERS[i]
 
-            plt.plot(xs, ys, f'-{marker}', markerfacecolor=facecolor, label=runner)
+            plt.plot(xs, ys, f'-{marker}',
+                     markerfacecolor=facecolor, label=runner)
 
         ax = plt.gca()
         ax.set_xscale('log', base=2)
@@ -96,8 +100,50 @@ def plot_throughput(configurations: list[Configuration]):
         save_plot(f"throughput-{strategy}")
 
 
-def plot_variance(configurations: list[Configuration]):
+def plot_throughput_per_query_type(configurations: list[Configuration]):
+    runners = ["postgres", "elasticsearch"]
+    query_types = ["in_many_articles", "in_few_articles", "random"]
 
+    configurations.sort(key=lambda x: x.config()["num_words"])
+
+    min_y, max_y = 0, 0
+
+    plt.figure(figsize=(13, 5))
+    for i, runner in enumerate(runners):
+        plt.subplot(1, len(runners), i + 1)
+
+        for j, qt in enumerate(query_types):
+            confs = [c for c in configurations if c.config(
+            )["strategy"] == "batch" and c.config()["query_type"] == qt]
+
+            xs = [c.config()["num_words"][0] for c in confs]
+            ys = [c.metrics(runner).throughput for c in confs]
+            marker, facecolor = MARKERS[j]
+
+            min_y = min(min_y, min(ys))
+            max_y = max(max_y, max(ys))
+
+            plt.plot(xs, ys, f'-{marker}',
+                     markerfacecolor=facecolor, label=f"{qt}")
+
+        ax = plt.gca()
+        ax.set_xscale('log', base=2)
+        ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
+
+        plt.xlabel("Number of words in search term")
+        plt.ylabel("Throughput (queries/second)")
+        plt.grid()
+        plt.title(f"{runner} query throughput for different query sizes")
+        plt.legend()
+
+    for i, _ in enumerate(runners):
+        plt.subplot(1, len(runners), i + 1)
+        plt.ylim(0, max_y * 1.1)
+
+    save_plot(f"throughput-query-cardinality")
+
+
+def plot_variance(configurations: list[Configuration]):
     runners = ["postgres", "elasticsearch"]
     strategies = ["single", "batch"]
 
@@ -109,7 +155,11 @@ def plot_variance(configurations: list[Configuration]):
         for i, runner in enumerate(runners):
             plt.subplot(1, len(runners), i + 1)
 
-            confs = [c for c in configurations if c.config()["strategy"] == strategy]
+            confs = [c for c in configurations if c.config()["strategy"]
+                     == strategy and c.config()["query_type"] == "in_many_articles"]
+
+            if not len(confs):
+                continue
 
             xs = [c.config()["num_words"][0] for c in confs]
             ys = [c.latencies(runner) for c in confs]
@@ -135,4 +185,5 @@ if __name__ == "__main__":
         print(c.config())
 
     plot_throughput(configurations)
+    plot_throughput_per_query_type(configurations)
     plot_variance(configurations)
