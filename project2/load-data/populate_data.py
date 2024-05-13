@@ -1,6 +1,7 @@
 import requests
 import os
 import shutil
+import json
 import bz2
 import xml.etree.ElementTree as ET
 import psycopg2
@@ -142,6 +143,7 @@ def get_target_size_gb():
         return int(sys.argv[6])
 
 def handle_data_loading():
+    raise Exception("Tietgen, use the plain text stuff :)")
 
     # datadir_path = "project2/load-data/articles/decompressed/"
     datadir_path = "articles/decompressed/"
@@ -160,8 +162,6 @@ def handle_data_loading():
             sys.exit(1)
     pass
 
-    decompressed_dir = os.scandir(datadir_path)
-
     port = get_port()
     size_gb = get_target_size_gb()
     target_size = size_gb*1000000000
@@ -177,6 +177,28 @@ def handle_data_loading():
         pages = load_articles_xml(io_entry.path)
         loaddata(pages, port)
 
+
+def handle_plaintext():
+    datadir_path = "articles/decompressed/"
+    decompressed_dir = os.scandir(datadir_path)
+
+    files = [file for file in decompressed_dir if file.is_file()]
+
+    out_dir = os.path.join(ARTICLES_DIR, "plaintext")
+
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
+    for io_entry in files:
+        pages = load_articles_xml(io_entry.path)
+
+        out_file = os.path.join(out_dir, io_entry.name + ".json")
+        print(f"Writing {len(pages)} pages to {out_file}")
+        with open(out_file, "w") as f:
+            json.dump(pages, f)
+        print(f"Wrote to {out_file}")
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python populate_data.py <command>")
@@ -187,6 +209,8 @@ def main():
             get_all_files()
         case "decompress":
             decompress_articles()
+        case "plaintext":
+            handle_plaintext()
         case "load":
             handle_data_loading()
         case _:
