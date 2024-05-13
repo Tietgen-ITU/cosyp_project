@@ -91,12 +91,12 @@ def load_articles_xml(file):
 
 
 def insert_into_postgres(pages: list[Union[str, str]], port: str):
-    con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:"+ port +"/cosyp")
+    con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:" + port + "/cosyp")
     cur = con.cursor()
 
     print("Inserting pages into Postgres")
     execute_batch(
-        cur, "INSERT INTO articles (title, body) VALUES (%s, %s)", pages)
+        cur, "INSERT INTO articles (title, body, search_vector) VALUES (%s, %s, to_tsvector('english', body)", pages)
     con.commit()
     print("Inserted pages into Postgres")
 
@@ -179,6 +179,7 @@ def handle_data_loading():
     for io_entry in files:
         if target_size < io_entry.stat().st_size:
             break
+
         target_size -= io_entry.stat().st_size
         pages = load_articles_xml(io_entry.path)
         loaddata(pages, port)
