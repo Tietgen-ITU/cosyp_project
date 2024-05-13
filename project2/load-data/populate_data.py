@@ -15,6 +15,7 @@ import time
 
 DUMP_HOST_URL = "https://dumps.wikimedia.org"
 ARTICLES_DIR = "articles"
+PLAINTEXT_DIR = os.path.join(ARTICLES_DIR, "plaintext")
 
 
 def get_all_files():
@@ -143,11 +144,6 @@ def get_target_size_gb():
         return int(sys.argv[6])
 
 def handle_data_loading():
-    raise Exception("Tietgen, use the plain text stuff :)")
-
-    # datadir_path = "project2/load-data/articles/decompressed/"
-    datadir_path = "articles/decompressed/"
-
     loaddata = None # Declare loaddata function
     mode = "--both" if len(sys.argv) < 3 else sys.argv[2]
     match mode:
@@ -164,9 +160,12 @@ def handle_data_loading():
 
     port = get_port()
     size_gb = get_target_size_gb()
-    target_size = size_gb*1000000000
+    gb_multiplier = 1000000000
+    target_size = size_gb*gb_multiplier
 
-    files = [file for file in decompressed_dir if file.is_file()]
+    dir_contents = os.scandir(PLAINTEXT_DIR)
+
+    files = [file for file in dir_contents if file.is_file()]
     files.sort(key=lambda x: x.stat().st_size, reverse=True)
 
     for io_entry in files:
@@ -174,7 +173,14 @@ def handle_data_loading():
             continue
 
         target_size -= io_entry.stat().st_size
-        pages = load_articles_xml(io_entry.path)
+
+        print(f"Loading {io_entry.stat().st_size / gb_multiplier:.1f} GB from {io_entry.name}")
+        start = time.monotonic()
+        with open(io_entry) as f:
+            pages = json.load(f)
+        end = time.monotonic()
+        print(f"Finished loading in {end - start:.1f}s")
+
         loaddata(pages, port)
 
 
@@ -189,7 +195,7 @@ def handle_plaintext():
     iter_count = 11
     number_of_skip_files = num*iter_count
 
-    out_dir = os.path.join(ARTICLES_DIR, "plaintext")
+    out_dir = PLAINTEXT_DIR
 
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
