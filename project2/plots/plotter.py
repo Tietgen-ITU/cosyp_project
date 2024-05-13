@@ -5,6 +5,7 @@ import os
 import sys
 import json
 import matplotlib as mpl
+from numpy import average
 
 mpl.rcParams['figure.dpi'] = 600
 
@@ -39,6 +40,9 @@ class Configuration:
         throughput = n / \
             (self.data["runners"][runner]["total_elapsed_ms"] / 1000)
         return Metrics(avg_latency, percentile_99, percentile_1, throughput)
+
+    def resource_usage(self, runner: str):
+        return self.data["runners"][runner]["stats"]
 
 
 @dataclass
@@ -97,7 +101,8 @@ def plot_throughput(configurations: list[Configuration]):
             plt.xlabel("Number of words in search term")
             plt.ylabel("Throughput (queries/second)")
             plt.grid()
-            plt.title(f"Throughput for different query sizes ({strategy}, {qt})")
+            plt.title(
+                f"Throughput for different query sizes ({strategy}, {qt})")
             plt.legend()
 
             save_plot(f"throughput-{strategy}-{qt}")
@@ -175,6 +180,61 @@ def plot_variance(configurations: list[Configuration]):
             save_plot(f"variance-{strategy}-{qt}")
 
 
+def plot_resource_usage(configurations: list[Configuration]):
+    configurations.sort(key=lambda x: x.config()["num_words"])
+
+    for qt in query_types:
+        plt.figure(figsize=(13, 5))
+        max_perc = 0
+        for i, runner in enumerate(runners):
+            for j, strategy in enumerate(strategies):
+                plt.subplot(1, len(runners), i + 1)
+
+                confs = [c for c in configurations if c.config(
+                )["strategy"] == strategy and c.config()["query_type"] == qt]
+
+                xs, ys = [], []
+                marker, facecolor = MARKERS[j]
+                for c in confs:
+                    x = c.config()["num_words"][0]
+                    percs = [stat["cpu_perc"]
+                             for stat in c.resource_usage(runner)]
+
+                    if len(percs) == 0:
+                        continue
+
+                    xs.append(x)
+                    y = average(percs)
+                    ys.append(y)
+
+                    max_percs = [stat["cpu_max_perc"]
+                                 for stat in c.resource_usage(runner)]
+                    max_perc = max(max_perc, max(max_percs))
+
+                plt.plot(xs, ys, f'-{marker}',
+                         markerfacecolor=facecolor, label=f"{strategy}")
+
+                ax = plt.gca()
+                ax.set_xscale('log', base=2)
+                ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
+
+                plt.title(runner)
+                plt.xlabel("Number of words in search term")
+                plt.ylabel(f"CPU usage (%)")
+                plt.grid()
+
+        for i, _ in enumerate(runners):
+            plt.subplot(1, len(runners), i + 1)
+            plt.axhline(y=max_perc, color='r', linestyle='--',
+                        label='maximum possible cpu usage')
+            plt.ylim(0, max_perc * 1.1)
+            plt.legend()
+
+        plt.suptitle(f"Resource usage for different strategies ({qt})")
+
+        save_plot(f"resource-usage-{qt}")
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python plotter.py <dir path>")
@@ -188,3 +248,4 @@ if __name__ == "__main__":
     plot_throughput(configurations)
     plot_throughput_per_query_type(configurations)
     plot_variance(configurations)
+    plot_resource_usage(configurations)
