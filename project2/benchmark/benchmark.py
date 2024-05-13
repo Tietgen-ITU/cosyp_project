@@ -219,7 +219,7 @@ if __name__ == "__main__":
     SEED = 42
     num_queries = [500]
 
-    with_system_stats = False
+    with_system_stats = True
 
     for repetition in range(repetitions):
         for nq in num_queries:
