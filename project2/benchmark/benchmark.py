@@ -129,12 +129,13 @@ def run_configuration(pg, es, out_dir, configuration):
     print(f"Generating {n} search terms...")
     start = time.monotonic()
 
-    search_terms = generate_search_terms(
+    search_term_categories = generate_search_terms(
         pg,
         num_queries=n,
         num_words=configuration['num_words'],
         max_articles_sourced=configuration['max_articles_sourced'],
         seed=configuration['seed'])
+    search_terms = search_term_categories[configuration['query_type']]
 
     end = time.monotonic()
     print(f"Generated search terms in {end - start:.2f}s")
@@ -213,9 +214,10 @@ if __name__ == "__main__":
     num_words = [(1, 1), (2, 2), (4, 4), (8, 8), (16, 16),
                  (32, 32), (64, 64), (128, 128)]
     strategies = [STRATEGY_BATCH, STRATEGY_SINGLE]
+    query_types = ["random", "in_few_articles", "in_many_articles"]
     repetitions = 1
-    SEED = 1337
-    num_queries = [50]
+    SEED = 42
+    num_queries = [500]
 
     with_system_stats = False
 
@@ -223,17 +225,22 @@ if __name__ == "__main__":
         for nq in num_queries:
             for strategy in strategies:
                 for nw in num_words:
-                    configurations.append({
-                        "num_queries": nq,
-                        "strategy": strategy,
-                        "num_words": nw,
-                        "max_articles_sourced": 1000,
-                        "seed": SEED,
-                        "repetition": repetition,
-                        "with_system_stats": with_system_stats,
-                    })
+                    for qt in query_types:
+                        configurations.append({
+                            "num_queries": nq,
+                            "strategy": strategy,
+                            "num_words": nw,
+                            "max_articles_sourced": 50000,
+                            "seed": SEED,
+                            "repetition": repetition,
+                            "with_system_stats": with_system_stats,
+                            "query_type": qt
+                        })
 
-    for configuration in configurations:
-        print(f"Running configuration: {configuration}")
+    for i, configuration in enumerate(configurations, start=1):
+        start = time.monotonic()
+        print(f"Running configuration {i}/{len(configurations)}: {configuration}")
         run_configuration(pg, es, BENCH_DIR, configuration)
+        end = time.monotonic()
+        print(f"Configuration {i}/{len(configurations)} completed in {end - start:.2f}s")
         print()
