@@ -90,8 +90,8 @@ def load_articles_xml(file):
     return pages
 
 
-def insert_into_postgres(pages: list[Union[str, str]]):
-    con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:5049/cosyp")
+def insert_into_postgres(pages: list[Union[str, str]], port: str):
+    con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:"+ port +"/cosyp")
     cur = con.cursor()
 
     print("Inserting pages into Postgres")
@@ -114,8 +114,8 @@ def insert_into_postgres(pages: list[Union[str, str]]):
     #   ORDER BY rank DESC;
 
 
-def insert_into_elasticsearch(pages: list[Union[str, str]]):
-    es = Elasticsearch("http://localhost:9200")
+def insert_into_elasticsearch(pages: list[Union[str, str]], port: str):
+    es = Elasticsearch("http://localhost:"+port)
 
     print("Indexing documents in Elasticsearch")
 
@@ -132,6 +132,22 @@ def insert_into_elasticsearch(pages: list[Union[str, str]]):
     # Query:
     #   es.search(index="articles", query={'match':{'body':'serach term'}}, fields=["title"], source=False)
 
+def get_port():
+
+    if len(sys.argv) < 5:
+        print("Usage: python populate_data.py load <mode> -p <port> -s <size in gb>")
+        sys.exit(1)
+
+    return sys.argv[4]
+
+def get_target_size_gb():
+
+        if len(sys.argv) < 7:
+            print("Usage: python populate_data.py load <mode> -p <port> -s <size in gb>")
+            sys.exit(1)
+
+        return int(sys.argv[6])
+
 def handle_data_loading():
 
     # datadir_path = "project2/load-data/articles/decompressed/"
@@ -141,11 +157,11 @@ def handle_data_loading():
     mode = "--both" if len(sys.argv) < 3 else sys.argv[2]
     match mode:
         case "--postgres":
-            loaddata = lambda pages: insert_into_postgres(pages)
+            loaddata = lambda pages, port: insert_into_postgres(pages, port)
         case "--elastic":
-            loaddata = lambda pages: insert_into_elasticsearch(pages)
+            loaddata = lambda pages, port: insert_into_elasticsearch(pages, port)
         case "--both":
-            loaddata = lambda pages: (insert_into_postgres(pages), insert_into_elasticsearch(pages))
+            loaddata = lambda pages, port: (insert_into_postgres(pages, port), insert_into_elasticsearch(pages, port))
         case _:
             print("Invalid load category")
             sys.exit(1)
@@ -153,10 +169,19 @@ def handle_data_loading():
 
     decompressed_dir = os.scandir(datadir_path)
 
-    for io_entry in decompressed_dir:
-        if io_entry.is_file():
-            pages = load_articles_xml(io_entry.path)
-            loaddata(pages)
+    port = get_port()
+    size_gb = get_target_size_gb()
+    target_size = size_gb*1000000000
+
+    files = [file for file in decompressed_dir if file.is_file()]
+    files.sort(key=lambda x: x.stat().st_size)
+
+    for io_entry in files:
+        if target_size < io_entry.stat().st_size:
+            break
+        target_size -= io_entry.stat().st_size
+        pages = load_articles_xml(io_entry.path)
+        loaddata(pages, port)
 
 def main():
     if len(sys.argv) < 2:
