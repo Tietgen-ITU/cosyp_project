@@ -214,7 +214,7 @@ if __name__ == "__main__":
     num_words = [(1, 1), (2, 2), (4, 4), (8, 8), (16, 16),
                  (32, 32), (64, 64), (128, 128)]
     strategies = [STRATEGY_BATCH, STRATEGY_SINGLE]
-    query_types = ["random", "in_few_articles", "in_many_articles"]
+    query_types = ["random", "no_matches", "in_few_articles", "in_many_articles"]
     repetitions = 1
     SEED = 42
     num_queries = [500]

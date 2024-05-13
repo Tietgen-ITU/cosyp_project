@@ -11,7 +11,7 @@ mpl.rcParams['figure.dpi'] = 600
 
 strategies = ["batch", "single"]
 runners = ["postgres", "elasticsearch"]
-query_types = ["in_many_articles", "in_few_articles", "random"]
+query_types = ["in_many_articles", "in_few_articles", "random", "no_matches"]
 
 
 @dataclass
