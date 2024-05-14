@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sizes=(1 2 4 8 16 32)
+sizes=(1 2 4 8)
 count=`expr ${#sizes[@]} - 1`
 elastic_port=9200
 psql_port=5049
@@ -18,8 +18,8 @@ do :
     export DATASET_SIZE_GB="$size"
 
     docker compose start "psql-${size}g"
-    docker compose start "elasic-${size}g"
+    docker compose start "elastic-${size}g"
     python3 benchmark.py
     docker compose stop "psql-${size}g"
-    docker compose stop "elasic-${size}g"
+    docker compose stop "elastic-${size}g"
 done
