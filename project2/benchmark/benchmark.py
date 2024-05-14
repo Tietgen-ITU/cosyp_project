@@ -8,6 +8,8 @@ import hashlib
 from datetime import datetime
 import docker
 from multiprocessing import Process, Queue
+import threading
+import numpy as np
 
 
 LIMIT = 5
@@ -18,10 +20,12 @@ STRATEGY_SINGLE = "single"
 POSTGRES_NAME = 'postgres'
 ELASTICSEARCH_NAME = 'elasticsearch'
 
+NUM_PARALLEL_UNITS = 4
+
 
 def connect():
     con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:5049/cosyp")
-    pg = con.cursor()
+    pg = con
     es = Elasticsearch("http://localhost:9200", request_timeout=1000000)
     return pg, es
 
@@ -131,9 +135,11 @@ def drain_queue(q):
 
 def run_configuration(pg, es, out_dir, configuration):
     runners = [
-        (POSTGRES_NAME, lambda terms: query_postgres(pg, terms)),
-        (ELASTICSEARCH_NAME, lambda terms: query_elasticsearch(es, terms))
+        (POSTGRES_NAME, lambda con: (lambda terms: query_postgres(con, terms))),
+        (ELASTICSEARCH_NAME, lambda _: (lambda terms: query_elasticsearch(es, terms)))
     ]
+
+    cursors = [pg.cursor() for _ in range(NUM_PARALLEL_UNITS)]
 
     n = configuration['num_queries']
 
@@ -169,14 +175,29 @@ def run_configuration(pg, es, out_dir, configuration):
         runner_start = time.monotonic_ns()
 
         if configuration['strategy'] == STRATEGY_SINGLE:
-            for i, term in enumerate(bench["search_terms"]):
-                if i % 10 == 0:
-                    print(f"\rProgress for {name}: query {i}/{n}...", end="")
+            print(f"\rProgress for {name}: vroom...", end="")
+            result_queue = Queue()
 
-                query_bench = measure_query(i, [term], runner)
-                out.append(query_bench)
+            num_threads = min(NUM_PARALLEL_UNITS, len(search_terms))
+            chunks = np.array_split(np.array(search_terms), 6)
 
-            print(f"\rProgress for {name}: query {n}/{n}...")
+            def brrr(id, runner, search_terms, result_queue):
+                for i, term in enumerate(search_terms):
+                    print(f"\rProgress for {name}.{id}: {i}/{len(search_terms)}...", end="")
+                    query_bench = measure_query(i, [term], runner)
+                    result_queue.put(query_bench)
+
+            ts = []
+            for i in range(num_threads):
+                t = threading.Thread(target=brrr, args=(i, runner(cursors[i]), chunks[i], result_queue))
+                ts.append(t)
+
+            for t in ts:
+                t.start()
+            for t in ts:
+                t.join()
+
+            print(f"\rProgress for {name}: donezo...")
         elif configuration['strategy'] == STRATEGY_BATCH:
             print(f"\rProgress for {name}: query 0/1...", end="")
             query_bench = measure_query(
@@ -224,7 +245,7 @@ if __name__ == "__main__":
 
     num_words = [(1, 1), (2, 2), (4, 4), (8, 8), (16, 16),
                  (32, 32), (64, 64), (128, 128)]
-    strategies = [STRATEGY_BATCH, STRATEGY_SINGLE]
+    strategies = [STRATEGY_SINGLE,STRATEGY_BATCH ]
     query_types = ["random", "no_matches", "in_few_articles", "in_many_articles"]
     repetitions = 1
     SEED = 42
