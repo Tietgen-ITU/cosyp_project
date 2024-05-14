@@ -42,9 +42,11 @@ def measure_query(id, search_terms, runner):
 
 
 def make_postgres_query(term):
+    tsquery = ' & '.join(term.split())
+
     return f"""
         SELECT title, ts_rank(search_vector, query) as rank
-        FROM articles, plainto_tsquery('english', '{term}') query
+        FROM articles, to_tsquery('english', '{tsquery}') query
         WHERE query @@ search_vector
         ORDER BY rank DESC
         LIMIT {LIMIT};
@@ -249,7 +251,7 @@ if __name__ == "__main__":
     query_types = ["random", "no_matches", "in_few_articles", "in_many_articles"]
     repetitions = 1
     SEED = 42
-    num_queries = [500]
+    num_queries = [250]
 
     with_system_stats = True
 
