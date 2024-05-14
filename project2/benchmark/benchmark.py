@@ -22,7 +22,7 @@ ELASTICSEARCH_NAME = 'elasticsearch'
 def connect():
     con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:5049/cosyp")
     pg = con.cursor()
-    es = Elasticsearch("http://localhost:9200")
+    es = Elasticsearch("http://localhost:9200", request_timeout=1000000)
     return pg, es
 
 
