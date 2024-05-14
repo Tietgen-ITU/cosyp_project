@@ -1,5 +1,4 @@
 import psycopg2
-from psycopg2 import pool
 import time
 from elasticsearch import Elasticsearch
 from generate_queries import generate_search_terms
@@ -9,7 +8,6 @@ import hashlib
 from datetime import datetime
 import docker
 from multiprocessing import Process, Queue
-import threading
 
 
 LIMIT = 5
@@ -19,8 +17,6 @@ STRATEGY_SINGLE = "single"
 
 POSTGRES_NAME = 'postgres'
 ELASTICSEARCH_NAME = 'elasticsearch'
-
-NUM_PARALLEL_UNITS = 4
 
 
 def connect():
@@ -36,19 +32,18 @@ def connect():
     print(f"Connecting to ElasticSearch at {elasticsearch_url}")
     print()
 
-    pg = pool.ThreadedConnectionPool(4, 7, postgres_con_string)
+    con = psycopg2.connect(postgres_con_string)
+    pg = con.cursor()
     es = Elasticsearch(elasticsearch_url, request_timeout=1000000)
     return pg, es
 
 
-def measure_query(id, search_terms, runner, out):
+def measure_query(id, search_terms, runner):
     start = time.monotonic_ns()
     runner(search_terms)
     end = time.monotonic_ns()
 
-    out_arr, out_i = out
-
-    out_arr[out_i] = {
+    return {
         "id": id,
         "elapsed_ms": (end - start) * 1e-6
     }
@@ -66,14 +61,11 @@ def make_postgres_query(term):
     """
 
 
-def query_postgres(pg, terms: list[str]):
+def query_postgres(cur, terms: list[str]):
     query = '\n'.join(make_postgres_query(term) for term in terms)
 
-    conn = pg.getconn()
-    cur = conn.cursor()
     cur.execute(query)
     results = cur.fetchall()
-    pg.putconn(conn)
 
     return results
 
@@ -162,16 +154,13 @@ def run_configuration(pg, es, out_dir, configuration):
     print(f"Generating {n} search terms...")
     start = time.monotonic()
 
-    conn = pg.getconn()
-    cur = conn.cursor()
     search_term_categories = generate_search_terms(
-        cur,
+        pg,
         num_queries=n,
         num_words=configuration['num_words'],
         max_articles_sourced=configuration['max_articles_sourced'],
         seed=configuration['seed'],
         dataset_size_gb=configuration['dataset_size_gb'])
-    pg.putconn(conn)
     search_terms = search_term_categories[configuration['query_type']]
 
     end = time.monotonic()
@@ -194,34 +183,20 @@ def run_configuration(pg, es, out_dir, configuration):
 
         runner_start = time.monotonic_ns()
 
-        # if configuration['strategy'] == STRATEGY_SINGLE:
-        #     for i, term in enumerate(bench["search_terms"]):
-        #         if i % 10 == 0:
-        #             print(f"\rProgress for {name}: query {i}/{n}...", end="")
-        #
-        #         query_bench = measure_query(i, [term], runner)
-        #         out.append(query_bench)
-        #
-        #     print(f"\rProgress for {name}: query {n}/{n}...")
-        if configuration['strategy'] == STRATEGY_BATCH:
-            print(f"\rProgress for {name}: query 0/1...", end="")
-
-            chunks = [[] for _ in range(NUM_PARALLEL_UNITS)]
+        if configuration['strategy'] == STRATEGY_SINGLE:
             for i, term in enumerate(bench["search_terms"]):
-                chunks[i % len(chunks)].append(term)
+                if i % 10 == 0:
+                    print(f"\rProgress for {name}: query {i}/{n}...", end="")
 
-            threads = []
-            outputs = [None for _ in range(len(chunks))]
-            for i, chunk in enumerate(chunks):
-                threads.append(threading.Thread(target=measure_query, args=(i, chunk, runner, (outputs, i))))
+                query_bench = measure_query(i, [term], runner)
+                out.append(query_bench)
 
-            for t in threads:
-                t.start()
-            for t in threads:
-                t.join()
-
-            for o in outputs:
-                out.append(o)
+            print(f"\rProgress for {name}: query {n}/{n}...")
+        elif configuration['strategy'] == STRATEGY_BATCH:
+            print(f"\rProgress for {name}: query 0/1...", end="")
+            query_bench = measure_query(
+                list(range(0, n+1)), bench["search_terms"], runner)
+            out.append(query_bench)
             print(f"\rProgress for {name}: query 1/1...")
 
         runner_end = time.monotonic_ns()
@@ -267,9 +242,9 @@ if __name__ == "__main__":
 
     num_words = [(1, 1), (2, 2), (4, 4), (8, 8), (16, 16),
                  (32, 32), (64, 64), (128, 128)]
-    strategies = [STRATEGY_BATCH]
+    strategies = [STRATEGY_BATCH, STRATEGY_SINGLE]
     query_types = ["random", "no_matches", "in_few_articles", "in_many_articles"]
-    repetitions = 1
+    repetitions = 4
     num_queries = [500]
 
     dataset_size_gb = os.environ.get('DATASET_SIZE_GB')
