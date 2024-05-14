@@ -15,6 +15,7 @@ do :
     eport=`expr $elastic_port + $i`
     export COSYP_PSQL_CONNECTION_STRING="postgresql://cosyp-sa:123@localhost:${pport}/cosyp"
     export COSYP_ELASTIC_URL="http://localhost:${eport}"
+    export DATASET_SIZE_GB="$size"
 
     docker compose start "psql-${size}g elasic-${size}g"
     python3 benchmark.py

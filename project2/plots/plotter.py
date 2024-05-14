@@ -236,6 +236,52 @@ def plot_resource_usage(configurations: list[Configuration]):
         save_plot(f"resource-usage-{qt}")
 
 
+def plot_latencies(configurations: list[Configuration]):
+    configurations.sort(key=lambda x: x.config()["num_words"])
+
+    for qt in query_types:
+        charts = [
+            {
+                "title": "Average",
+                "key": "avg_latency",
+            },
+            {
+                "title": "99% percentile",
+                "key": "percentile_99",
+            },
+            {
+                "title": "1% percentile",
+                "key": "percentile_1",
+            },
+        ]
+
+        for chart in charts:
+            width = 0.33
+
+            plt.figure(figsize=(13, 5))
+
+            for i, runner in enumerate(runners):
+                ax = plt.gca()
+
+                confs = [c for c in configurations if c.config(
+                )["strategy"] == "single" and c.config()["query_type"] == qt]
+
+                bar_positions = list(range(len(confs)))
+                xs = [x - width / 2 + width * i for x in bar_positions]
+                ys = [getattr(c.metrics(runner), chart["key"]) for c in confs]
+
+                rects = ax.bar(xs, ys, width=width, label=runner)
+                ax.bar_label(rects, padding=3, labels=[f"{y:.1f}ms" for y in ys])
+                ax.set_xticks(bar_positions, [c.config()["num_words"][0] for c in confs])
+
+            plt.xlabel("Number of words in search term")
+            plt.ylabel("Latency (ms)")
+            plt.title(f"{chart['title']} latency for different query sizes ({qt})")
+            plt.legend()
+
+            save_plot(f"latency-{chart['key']}-{qt}")
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python plotter.py <dir path>")
@@ -254,4 +300,6 @@ if __name__ == "__main__":
     plot_variance(configurations)
     print("Plotting resource usage...")
     plot_resource_usage(configurations)
+    print("Plotting latencies...")
+    plot_latencies(configurations)
     print("Done")
