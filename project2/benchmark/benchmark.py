@@ -244,15 +244,14 @@ if __name__ == "__main__":
                  (32, 32), (64, 64), (128, 128)]
     strategies = [STRATEGY_BATCH, STRATEGY_SINGLE]
     query_types = ["random", "no_matches", "in_few_articles", "in_many_articles"]
-    repetitions = 1
-    SEED = 42
-    num_queries = [250]
+    repetitions = 4
+    num_queries = [500]
 
     dataset_size_gb = os.environ.get('DATASET_SIZE_GB')
 
     with_system_stats = True
 
-    for repetition in range(repetitions):
+    for repetition in range(1, repetitions+1):
         for nq in num_queries:
             for strategy in strategies:
                 for nw in num_words:
@@ -262,7 +261,7 @@ if __name__ == "__main__":
                             "strategy": strategy,
                             "num_words": nw,
                             "max_articles_sourced": 50000,
-                            "seed": SEED,
+                            "seed": repetition * 42,
                             "repetition": repetition,
                             "with_system_stats": with_system_stats,
                             "dataset_size_gb": dataset_size_gb,
