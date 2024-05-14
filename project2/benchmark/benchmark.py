@@ -229,7 +229,10 @@ def run_configuration(pg, es, out_dir, configuration):
 if __name__ == "__main__":
     pg, es = connect()
 
-    folder_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    folder_name = os.environ.get('BENCH_FOLDER_NAME')
+    if folder_name is None:
+        folder_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
     BENCH_DIR = f"benches/{folder_name}"
     if not os.path.exists(BENCH_DIR):
         os.makedirs(BENCH_DIR)
@@ -243,6 +246,8 @@ if __name__ == "__main__":
     repetitions = 1
     SEED = 42
     num_queries = [250]
+
+    dataset_size_gb = 2 # <- GET THIS FROM YOUR SCRIPT TIETGEN
 
     with_system_stats = True
 
@@ -259,6 +264,7 @@ if __name__ == "__main__":
                             "seed": SEED,
                             "repetition": repetition,
                             "with_system_stats": with_system_stats,
+                            "dataset_size_gb": dataset_size_gb,
                             "query_type": qt
                         })
 
