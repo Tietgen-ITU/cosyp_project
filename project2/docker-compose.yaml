@@ -8,7 +8,7 @@ services:
     ports:
       - '127.0.0.1:5049:5432'
     volumes:
-      - /home/Group101/data/psql/1g:/var/lib/postgresql/data
+      - /home/Group101/data/psql/1gg:/var/lib/postgresql/data
 
   psql-2g:
     container_name: psql-2g
@@ -49,14 +49,6 @@ services:
       - '127.0.0.1:5054:5432'
     volumes:
       - /home/Group101/data/psql/32g:/var/lib/postgresql/data
-
-  psql-64g:
-    container_name: psql-64g
-    image: arne4545/cosyp-psql:latest
-    ports:
-      - '127.0.0.1:5055:5432'
-    volumes:
-      - /home/Group101/data/psql/64g:/var/lib/postgresql/data
 
   elastic-1g:
     container_name: elastic-1g
@@ -111,12 +103,3 @@ services:
       - '127.0.0.1:9305:9300'
     volumes:
       - /home/Group101/data/elastic/32g:/usr/share/elasticsearch/data
-
-  elastic-64g:
-    container_name: elastic-64g
-    image: arne4545/cosyp-elastic:latest
-    ports:
-      - '127.0.0.1:9206:9200'
-      - '127.0.0.1:9306:9300'
-    volumes:
-      - /home/Group101/data/elastic/64g:/usr/share/elasticsearch/data
