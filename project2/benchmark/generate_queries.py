@@ -39,13 +39,13 @@ word_article_freqs = None
 cache_file = "search_terms_cache.json"
 
 
-def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_words=(1, 6), seed=None):
+def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_words=(1, 6), seed=None, dataset_size_gb=None):
     if not os.path.exists(cache_file):
         with open(cache_file, "w") as f:
             json.dump({}, f)
     with open(cache_file, "r") as f:
         current_cache = json.load(f)
-    cache_key = f"{num_queries}_{max_articles_sourced}_{num_words[0]}-{num_words[1]}_{seed}"
+    cache_key = f"{num_queries}_{max_articles_sourced}_{num_words[0]}-{num_words[1]}_{seed}_{dataset_size_gb}"
 
     if cache_key in current_cache:
         print("Using cached search terms for key", cache_key)

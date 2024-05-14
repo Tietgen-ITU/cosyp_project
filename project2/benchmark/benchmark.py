@@ -244,6 +244,8 @@ if __name__ == "__main__":
     SEED = 42
     num_queries = [250]
 
+    dataset_size_gb = 2 # <- GET THIS FROM YOUR SCRIPT TIETGEN
+
     with_system_stats = True
 
     for repetition in range(repetitions):
@@ -259,6 +261,7 @@ if __name__ == "__main__":
                             "seed": SEED,
                             "repetition": repetition,
                             "with_system_stats": with_system_stats,
+                            "dataset_size_gb": dataset_size_gb,
                             "query_type": qt
                         })
 
