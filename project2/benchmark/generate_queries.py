@@ -215,7 +215,13 @@ def count_words(cur, seed=None):
 
 
 def connect():
-    con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:5049/cosyp")
+    postgres_con_string = os.environ.get('COSYP_PSQL_CONNECTION_STRING')
+    if postgres_con_string is None:
+        postgres_con_string = "postgresql://cosyp-sa:123@localhost:5049/cosyp"
+
+    print(f"Connecting to Postgres via {postgres_con_string}")
+ 
+    con = psycopg2.connect(postgres_con_string)
     pg = con.cursor()
     return pg
 
