@@ -13,6 +13,7 @@ mpl.rcParams['figure.dpi'] = 600
 strategies = ["batch", "single"]
 runners = ["postgres", "elasticsearch"]
 query_types = ["in_many_articles", "in_few_articles", "random", "no_matches"]
+dataset_sizes = ["1", "2", "4", "8", "16", "32"]
 
 
 @dataclass
@@ -282,6 +283,52 @@ def plot_latencies(configurations: list[Configuration]):
             save_plot(f"latency-{chart['key']}-{qt}")
 
 
+def plot_throughput_per_dataset_size(configurations: list[Configuration]):
+    configurations.sort(key=lambda x: x.config()["num_words"])
+    query_type = "random"
+
+    for strategy in strategies:
+        min_y, max_y = 0, 0
+
+        plt.figure(figsize=(13, 5))
+        for i, runner in enumerate(runners):
+            plt.subplot(1, len(runners), i + 1)
+
+            for j, dataset_size in enumerate(dataset_sizes):
+                confs = [c for c in configurations if c.config()["strategy"] == strategy and c.config()["query_type"] == query_type and c.config()["dataset_size_gb"] == dataset_size]
+
+                if not len(confs):
+                    continue
+
+                xs = [c.config()["num_words"][0] for c in confs]
+                ys = [c.metrics(runner).throughput for c in confs]
+                marker, facecolor = MARKERS[j]
+
+                min_y = min(min_y, min(ys))
+                max_y = max(max_y, max(ys))
+
+                plt.plot(xs, ys, f'-{marker}',
+                         markerfacecolor=facecolor, label=f"{dataset_size} GB")
+
+            ax = plt.gca()
+            ax.set_xscale('log', base=2)
+            ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
+
+            plt.xlabel("Number of words in search term")
+            plt.ylabel("Throughput (queries/second)")
+            plt.grid()
+            plt.title(runner)
+            plt.legend()
+
+        for i, _ in enumerate(runners):
+            plt.subplot(1, len(runners), i + 1)
+            plt.ylim(0, max_y * 1.1)
+
+        plt.suptitle(f"Throughput for different dataset sizes ({strategy}, {query_type})")
+
+        save_plot(f"throughput-dataset-size-{strategy}")
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python plotter.py <dir path>")
@@ -292,14 +339,18 @@ if __name__ == "__main__":
     for c in configurations:
         print(c.config())
 
+    one_size_confs = [c for c in configurations if c.config()["dataset_size_gb"] == "1"]
+
     print("Plotting throughput...")
-    plot_throughput(configurations)
+    plot_throughput(one_size_confs)
     print("Plotting throughput per query type...")
-    plot_throughput_per_query_type(configurations)
+    plot_throughput_per_query_type(one_size_confs)
     print("Plotting variance...")
-    plot_variance(configurations)
+    plot_variance(one_size_confs)
     print("Plotting resource usage...")
-    plot_resource_usage(configurations)
+    plot_resource_usage(one_size_confs)
     print("Plotting latencies...")
-    plot_latencies(configurations)
+    plot_latencies(one_size_confs)
+    print("Plotting throughput per dataset size...")
+    plot_throughput_per_dataset_size(configurations)
     print("Done")
