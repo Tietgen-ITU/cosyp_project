@@ -22,7 +22,7 @@ ELASTICSEARCH_NAME = 'elasticsearch'
 def connect():
     con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:5049/cosyp")
     pg = con.cursor()
-    es = Elasticsearch("http://localhost:9200")
+    es = Elasticsearch("http://localhost:9200", request_timeout=1000000)
     return pg, es
 
 
@@ -82,11 +82,22 @@ def query_elasticsearch(es, terms: list[str]):
 def measure_container_stats(name, queue):
     docker_client = docker.from_env()
 
-    containers = {}
-    containers[POSTGRES_NAME] = "cosyp-postgres"
-    containers[ELASTICSEARCH_NAME] = "cosyp-elastic"
+    container_name = None
+    for c in docker_client.containers.list():
+        if name == POSTGRES_NAME and "psql" in c.name or "postgres" in c.name:
+            container_name = c.name
+            break
+        if name == ELASTICSEARCH_NAME and "elastic" in c.name:
+            container_name = c.name
+            break
 
-    container = docker_client.containers.get(containers[name])
+    if container_name is None:
+        print(f"  Could not find a running container for {name}")
+        return
+
+    print(f" Measuring stats for container {container_name}", end="", flush=True)
+
+    container = docker_client.containers.get(container_name)
 
     for stats in container.stats(decode=True):
         try:
