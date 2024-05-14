@@ -1,8 +1,0 @@
-[package]
-name = "wikipedia_parser"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-json-writer = "0.3.0"
-quick-xml = "0.31.0"
