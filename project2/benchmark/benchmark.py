@@ -248,7 +248,7 @@ if __name__ == "__main__":
     SEED = 42
     num_queries = [250]
 
-    dataset_size_gb = 2 # <- GET THIS FROM YOUR SCRIPT TIETGEN
+    dataset_size_gb = os.environ.get('DATASET_SIZE_GB')
 
     with_system_stats = True
 

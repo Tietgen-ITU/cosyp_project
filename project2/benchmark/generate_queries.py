@@ -241,7 +241,7 @@ if __name__ == "__main__":
         print("what should i do?")
         exit(1)
 
-    dataset_size_gb = 2
+    dataset_size_gb = os.environ.get('DATASET_SIZE_GB')
 
     pg = connect()
     if sys.argv[1] == "count":
