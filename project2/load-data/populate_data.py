@@ -99,14 +99,14 @@ def insert_into_postgres(pages: list[dict[str, str]], port: str):
 
     print("Inserting pages into Postgres")
     execute_batch(
-        cur, "INSERT INTO articles (title, body, search_vector) VALUES (%(title)s, %(body)s, to_tsvector('english', %(body)s))", pages)
+        cur, "INSERT INTO articles (title, body) VALUES (%(title)s, %(body)s)", pages)
     con.commit()
     print("Inserted pages into Postgres")
 
     # To create a full text search index:
     #
     #   ALTER TABLE articles ADD COLUMN search_vector tsvector;
-    #   UPDATE articles SET search_vector = to_tsvector('english', title || ' ' || content);
+    #   UPDATE articles SET search_vector = to_tsvector('english', body);
     #   CREATE INDEX articles_search_vector_idx ON articles USING gin(search_vector);
     #
     # To search:
