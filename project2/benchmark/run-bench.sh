@@ -17,7 +17,9 @@ do :
     export COSYP_ELASTIC_URL="http://localhost:${eport}"
     export DATASET_SIZE_GB="$size"
 
-    docker compose -f ../docker-compose.yaml start "psql-${size}g elasic-${size}g"
+    docker compose start "psql-${size}g"
+    docker compose start "elasic-${size}g"
     python3 benchmark.py
-    docker compose -f ../docker-compose.yaml stop "psql-${size}g elasic-${size}g"
+    docker compose stop "psql-${size}g"
+    docker compose stop "elasic-${size}g"
 done
