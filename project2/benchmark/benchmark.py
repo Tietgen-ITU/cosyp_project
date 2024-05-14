@@ -20,9 +20,21 @@ ELASTICSEARCH_NAME = 'elasticsearch'
 
 
 def connect():
-    con = psycopg2.connect("postgresql://cosyp-sa:123@localhost:5049/cosyp")
+    postgres_con_string = os.environ.get('COSYP_PSQL_CONNECTION_STRING')
+    elasticsearch_url = os.environ.get('COSYP_ELASTIC_URL')
+
+    if postgres_con_string is None:
+        postgres_con_string = "postgresql://cosyp-sa:123@localhost:5049/cosyp"
+    if elasticsearch_url is None:
+        elasticsearch_url = "http://localhost:9200"
+
+    print(f"Connecting to Postgres via {postgres_con_string}")
+    print(f"Connecting to ElasticSearch at {elasticsearch_url}")
+    print()
+
+    con = psycopg2.connect(postgres_con_string)
     pg = con.cursor()
-    es = Elasticsearch("http://localhost:9200", request_timeout=1000000)
+    es = Elasticsearch(elasticsearch_url, request_timeout=1000000)
     return pg, es
 
 
