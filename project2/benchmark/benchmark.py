@@ -229,7 +229,10 @@ def run_configuration(pg, es, out_dir, configuration):
 if __name__ == "__main__":
     pg, es = connect()
 
-    folder_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    folder_name = os.environ.get('BENCH_FOLDER_NAME')
+    if folder_name is None:
+        folder_name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
     BENCH_DIR = f"benches/{folder_name}"
     if not os.path.exists(BENCH_DIR):
         os.makedirs(BENCH_DIR)
