@@ -159,7 +159,8 @@ def run_configuration(pg, es, out_dir, configuration):
         num_queries=n,
         num_words=configuration['num_words'],
         max_articles_sourced=configuration['max_articles_sourced'],
-        seed=configuration['seed'])
+        seed=configuration['seed'],
+        dataset_size_gb=configuration['dataset_size_gb'])
     search_terms = search_term_categories[configuration['query_type']]
 
     end = time.monotonic()

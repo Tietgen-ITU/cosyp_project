@@ -39,13 +39,18 @@ word_article_freqs = None
 cache_file = "search_terms_cache.json"
 
 
+def make_article_freqs_filename(dataset_size_gb=None):
+    suffix = "" if dataset_size_gb is None else f"_{dataset_size_gb}gb"
+    return f"word_article_freqs{suffix}.json"
+
+
 def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_words=(1, 6), seed=None, dataset_size_gb=None):
     if not os.path.exists(cache_file):
         with open(cache_file, "w") as f:
             json.dump({}, f)
     with open(cache_file, "r") as f:
         current_cache = json.load(f)
-    cache_key = f"{num_queries}_{max_articles_sourced}_{num_words[0]}-{num_words[1]}_{seed}_{dataset_size_gb}"
+    cache_key = f"{num_queries}_{max_articles_sourced}_{num_words[0]}-{num_words[1]}_{seed}_{dataset_size_gb}gb"
 
     if cache_key in current_cache:
         print("Using cached search terms for key", cache_key)
@@ -53,7 +58,9 @@ def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_wo
 
     global word_article_freqs
     if word_article_freqs is None:
-        word_article_freqs = load_word_freqs("word_article_freqs.json")
+        freq_file = make_article_freqs_filename(dataset_size_gb)
+        print("Loading word article frequencies from", freq_file)
+        word_article_freqs = load_word_freqs(freq_file)
 
     random.seed(seed)
 
@@ -90,7 +97,8 @@ def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_wo
     min_words, max_words = num_words
 
     while len(search_term_score) < 100 * num_queries:
-        print(f"\rProgress: {len(search_term_score)}/{100 * num_queries}", end="")
+        print(
+            f"\rProgress: {len(search_term_score)}/{100 * num_queries}", end="")
         _, body = next(articles_iter)
 
         normalised = body.translate(table)
@@ -125,7 +133,8 @@ def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_wo
     for _ in range(num_queries):
         parts = []
         for _ in range(max(num_words)):
-            random_string = ''.join(random.choices(string.ascii_lowercase, k=16))
+            random_string = ''.join(
+                random.choices(string.ascii_lowercase, k=16))
             parts.append(random_string)
         garbage_terms = random.sample(parts, random.randint(*num_words))
         no_matches.append(' '.join(garbage_terms))
@@ -141,7 +150,8 @@ def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_wo
 
     high_cardinality = [term for term, _ in sorted_search_terms[:num_queries]]
     low_cardinality = [term for term, _ in sorted_search_terms[-num_queries:]]
-    random_queries = [term for term, _ in random.sample(sorted_search_terms, num_queries)]
+    random_queries = [term for term, _ in random.sample(
+        sorted_search_terms, num_queries)]
 
     results = {
         'in_many_articles': high_cardinality,
@@ -157,7 +167,7 @@ def generate_search_terms(cur, num_queries=10, max_articles_sourced=1000, num_wo
     return results
 
 
-def count_words(cur, seed=None):
+def count_words(cur, seed=None, dataset_size_gb=None):
     random.seed(seed)
 
     print("Fetching articles")
@@ -181,7 +191,7 @@ def count_words(cur, seed=None):
     trans["'"] = ""
     table = str.maketrans(trans)
 
-    word_freqs = defaultdict(lambda: 0)
+    # word_freqs = defaultdict(lambda: 0)
     word_article_freqs = defaultdict(lambda: 0)
 
     for i, (_, body) in enumerate(all):
@@ -191,8 +201,8 @@ def count_words(cur, seed=None):
         normalised = body.translate(table).lower()
         parts = [x for x in normalised.split()]
 
-        for part in parts:
-            word_freqs[part.lower()] += 1
+        # for part in parts:
+        #     word_freqs[part.lower()] += 1
 
         for word in set(parts):
             word_article_freqs[word] += 1
@@ -200,15 +210,15 @@ def count_words(cur, seed=None):
     print()
     print("Done processing articles")
 
-    sorted_freqs = sorted(word_freqs.items(), key=lambda x: x[1], reverse=True)
+    # sorted_freqs = sorted(word_freqs.items(), key=lambda x: x[1], reverse=True)
     sorted_article_freqs = sorted(
         word_article_freqs.items(), key=lambda x: x[1], reverse=True)
 
     print("Writing to file")
 
-    with open("word_freqs.json", "w") as f:
-        json.dump(dict(sorted_freqs), f, indent=2)
-    with open("word_article_freqs.json", "w") as f:
+    # with open("word_freqs.json", "w") as f:
+    #     json.dump(dict(sorted_freqs), f, indent=2)
+    with open(make_article_freqs_filename(dataset_size_gb), "w") as f:
         json.dump(dict(sorted_article_freqs), f, indent=2)
 
     print("Done writing to file")
@@ -220,7 +230,7 @@ def connect():
         postgres_con_string = "postgresql://cosyp-sa:123@localhost:5049/cosyp"
 
     print(f"Connecting to Postgres via {postgres_con_string}")
- 
+
     con = psycopg2.connect(postgres_con_string)
     pg = con.cursor()
     return pg
@@ -231,12 +241,14 @@ if __name__ == "__main__":
         print("what should i do?")
         exit(1)
 
+    dataset_size_gb = 2
+
     pg = connect()
     if sys.argv[1] == "count":
-        print(count_words(pg, seed=42))
+        print(count_words(pg, seed=42, dataset_size_gb=dataset_size_gb))
     elif sys.argv[1] == "gen":
         print(json.dumps(generate_search_terms(
-            pg, seed=1337, num_words=(4, 4)), indent=2))
+            pg, seed=1337, num_words=(4, 4), dataset_size_gb=dataset_size_gb), indent=2))
     else:
         print("idk bro")
     pg.close()
