@@ -280,15 +280,11 @@ def plot_latencies(configurations: list[Configuration]):
     ]
 
     for chart in charts:
-        width = 0.9
-
         plt.figure(figsize=(13, 5))
 
         max_y = 0
         for i, runner in enumerate(runners):
             ax = plt.subplot(1, len(runners), i + 1)
-
-            stack_ys = np.zeros(8)
 
             for j, qt in enumerate(query_types):
                 confs = [c for c in configurations if c.config()["query_type"] == qt]
@@ -297,17 +293,17 @@ def plot_latencies(configurations: list[Configuration]):
                 xs = [x for x in bar_positions]
                 ys = np.array([getattr(c.metrics(runner), chart["key"]) for c in confs])
 
-                rects = ax.bar(xs, ys, bottom=stack_ys, width=width, label=QT_LABELS[qt], zorder=3)
-                stack_ys += ys
-                max_y = max(max_y, max(stack_ys))
+                marker, facecolor = MARKERS[j]
+                ax.plot(xs, ys, f'-{marker}', markerfacecolor=facecolor, label=QT_LABELS[qt])
+                max_y = max(max_y, max(ys))
 
-                # ax.bar_label(rects, padding=3, labels=[f"{y:.1f}ms" for y in ys])
                 ax.set_xticks(bar_positions, [c.config()["num_words"][0] for c in confs])
 
             ax.grid(zorder=0)
 
         for i, runner in enumerate(runners):
             plt.subplot(1, len(runners), i + 1)
+            plt.grid()
             plt.ylim(0, max_y * 1.05)
             plt.xlabel("Number of words in search term")
             plt.ylabel("Latency (ms)")
