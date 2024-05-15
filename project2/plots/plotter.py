@@ -285,6 +285,7 @@ def plot_latencies(configurations: list[Configuration]):
         max_y = 0
         for i, runner in enumerate(runners):
             ax = plt.subplot(1, len(runners), i + 1)
+            ax.grid()
 
             for j, qt in enumerate(query_types):
                 confs = [c for c in configurations if c.config()["query_type"] == qt]
@@ -303,7 +304,6 @@ def plot_latencies(configurations: list[Configuration]):
 
         for i, runner in enumerate(runners):
             plt.subplot(1, len(runners), i + 1)
-            plt.grid()
             plt.ylim(0, max_y * 1.05)
             plt.xlabel("Number of words in search term")
             plt.ylabel("Latency (ms)")
