@@ -30,6 +30,11 @@ RUNNER_LABELS = {
     "elasticsearch": "Elasticsearch"
 }
 
+STRATEGY_LABELS = {
+    "batch": "Batch",
+    "single": "Sequential"
+}
+
 @dataclass
 class Configuration:
     data: dict
@@ -116,7 +121,7 @@ def plot_throughput(configurations: list[Configuration]):
             ax.set_xscale('log', base=2)
             ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
 
-            plt.xlabel("Number of words in search term")
+            plt.xlabel("Number of words in query")
             plt.ylabel("Throughput (queries/second)")
             plt.grid()
             plt.title(
@@ -156,7 +161,7 @@ def plot_throughput_per_query_type(configurations: list[Configuration]):
             ax.set_xscale('log', base=2)
             ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
 
-            plt.xlabel("Number of words in search term")
+            plt.xlabel("Number of words in query")
             plt.ylabel("Throughput (queries/second)")
             plt.grid()
             plt.title(RUNNER_LABELS[runner])
@@ -169,6 +174,53 @@ def plot_throughput_per_query_type(configurations: list[Configuration]):
         plt.suptitle(f"Throughput for different query types ({strategy})")
 
         save_plot(f"throughput-query-cardinality-{strategy}")
+
+
+def plot_throughput_per_strategy(configurations: list[Configuration]):
+    configurations = [g["combined"] for g in group_by_repetition(configurations)]
+    configurations = [c for c in configurations if c.config()["dataset_size_gb"] == "1"]
+    configurations.sort(key=lambda x: x.config()["num_words"])
+
+    for qt in query_types:
+        min_y, max_y = 0, 0
+
+        plt.figure(figsize=(13, 5))
+        for i, runner in enumerate(runners):
+            plt.subplot(1, len(runners), i + 1)
+
+            for j, strategy in enumerate(strategies):
+                confs = [c for c in configurations if c.config(
+                )["strategy"] == strategy and c.config()["query_type"] == qt]
+
+                xs = [c.config()["num_words"][0] for c in confs]
+                ys = [c.metrics(runner).throughput for c in confs]
+                marker, facecolor = MARKERS[j]
+
+                min_y = min(min_y, min(ys))
+                max_y = max(max_y, max(ys))
+
+                plt.plot(xs, ys, f'-{marker}',
+                         markerfacecolor=facecolor, label=f"{STRATEGY_LABELS[strategy]}")
+
+            ax = plt.gca()
+            ax.set_xscale('log', base=2)
+            ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
+
+            plt.xlabel("Number of words in query")
+            plt.ylabel("Throughput (queries/second)")
+            plt.grid()
+            plt.title(RUNNER_LABELS[runner])
+            plt.legend()
+
+        for i, _ in enumerate(runners):
+            plt.subplot(1, len(runners), i + 1)
+            plt.ylim(0, max_y * 1.1)
+
+        plt.suptitle(f"Throughput for different query strategies ({QT_LABELS[qt].lower()})")
+
+        save_plot(f"throughput-query-strategy-{qt}")
+
+
 
 
 def plot_variance(configurations: list[Configuration]):
@@ -195,7 +247,7 @@ def plot_variance(configurations: list[Configuration]):
                 plt.boxplot(ys, labels=xs, showmeans=True)
 
                 plt.title(f"Latencies for {runner} ({strategy}, {qt})")
-                plt.xlabel("Number of words in search term")
+                plt.xlabel("Number of words in query")
                 plt.ylabel("Latency (ms)")
                 plt.grid()
 
@@ -243,7 +295,7 @@ def plot_resource_usage(configurations: list[Configuration]):
                 ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
 
                 plt.title(RUNNER_LABELS[runner])
-                plt.xlabel("Number of words in search term")
+                plt.xlabel("Number of words in query")
                 plt.ylabel(f"CPU usage (%)")
                 plt.grid()
 
@@ -305,7 +357,7 @@ def plot_latencies(configurations: list[Configuration]):
         for i, runner in enumerate(runners):
             plt.subplot(1, len(runners), i + 1)
             plt.ylim(0, max_y * 1.05)
-            plt.xlabel("Number of words in search term")
+            plt.xlabel("Number of words in query")
             plt.ylabel("Latency (ms)")
             plt.title(RUNNER_LABELS[runner])
             plt.legend()
@@ -347,7 +399,7 @@ def plot_throughput_per_dataset_size(configurations: list[Configuration]):
             ax.set_xscale('log', base=2)
             ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
 
-            plt.xlabel("Number of words in search term")
+            plt.xlabel("Number of words in query")
             plt.ylabel("Throughput (queries/second)")
             plt.grid()
             plt.title(RUNNER_LABELS[runner])
@@ -412,4 +464,6 @@ if __name__ == "__main__":
     plot_latencies(configurations)
     print("Plotting throughput per dataset size...")
     plot_throughput_per_dataset_size(configurations)
+    print("Plotting throughput per strategy...")
+    plot_throughput_per_strategy(configurations)
     print("Done")
