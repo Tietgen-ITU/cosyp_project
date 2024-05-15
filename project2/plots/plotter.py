@@ -19,10 +19,10 @@ query_types = ["in_many_articles", "in_few_articles", "random", "no_matches"]
 dataset_sizes = ["1", "2", "4", "8", "16", "32"]
 
 QT_LABELS = {
-    "in_many_articles": "Queries with many hits",
-    "in_few_articles": "Queries with few hits",
+    "in_many_articles": "Abundant queries",
+    "in_few_articles": "Sparse queries",
     "random": "Random queries",
-    "no_matches": "Queries with 0 hits"
+    "no_matches": "No-hit queries"
 }
 
 RUNNER_LABELS = {
@@ -110,7 +110,7 @@ def plot_throughput(configurations: list[Configuration]):
                 marker, facecolor = MARKERS[i]
 
                 plt.plot(xs, ys, f'-{marker}',
-                         markerfacecolor=facecolor, label=runner)
+                         markerfacecolor=facecolor, label=RUNNER_LABELS[runner])
 
             ax = plt.gca()
             ax.set_xscale('log', base=2)
@@ -120,7 +120,7 @@ def plot_throughput(configurations: list[Configuration]):
             plt.ylabel("Throughput (queries/second)")
             plt.grid()
             plt.title(
-                f"Throughput for different query sizes ({strategy}, {qt})")
+                f"Throughput for different query sizes ({strategy}, {QT_LABELS[qt].lower()})")
             plt.legend()
 
             save_plot(f"throughput-{strategy}-{qt}")
@@ -150,7 +150,7 @@ def plot_throughput_per_query_type(configurations: list[Configuration]):
                 max_y = max(max_y, max(ys))
 
                 plt.plot(xs, ys, f'-{marker}',
-                         markerfacecolor=facecolor, label=f"{qt}")
+                         markerfacecolor=facecolor, label=f"{QT_LABELS[qt]}")
 
             ax = plt.gca()
             ax.set_xscale('log', base=2)
@@ -159,7 +159,7 @@ def plot_throughput_per_query_type(configurations: list[Configuration]):
             plt.xlabel("Number of words in search term")
             plt.ylabel("Throughput (queries/second)")
             plt.grid()
-            plt.title(runner)
+            plt.title(RUNNER_LABELS[runner])
             plt.legend()
 
         for i, _ in enumerate(runners):
@@ -242,7 +242,7 @@ def plot_resource_usage(configurations: list[Configuration]):
                 ax.set_xscale('log', base=2)
                 ax.xaxis.set_major_formatter(mticker.FormatStrFormatter('%d'))
 
-                plt.title(runner)
+                plt.title(RUNNER_LABELS[runner])
                 plt.xlabel("Number of words in search term")
                 plt.ylabel(f"CPU usage (%)")
                 plt.grid()
@@ -254,7 +254,7 @@ def plot_resource_usage(configurations: list[Configuration]):
             plt.ylim(0, max_perc * 1.1)
             plt.legend()
 
-        plt.suptitle(f"Resource usage for different strategies ({qt})")
+        plt.suptitle(f"CPU usage for different query strategies ({QT_LABELS[qt].lower()})")
 
         save_plot(f"resource-usage-{qt}")
 
@@ -270,11 +270,11 @@ def plot_latencies(configurations: list[Configuration]):
             "key": "avg_latency",
         },
         {
-            "title": "99% percentile",
+            "title": "99th percentile",
             "key": "percentile_99",
         },
         {
-            "title": "1% percentile",
+            "title": "1st percentile",
             "key": "percentile_1",
         },
     ]
@@ -361,7 +361,7 @@ def plot_throughput_per_dataset_size(configurations: list[Configuration]):
             plt.subplot(1, len(runners), i + 1)
             plt.ylim(0, max_y * 1.1)
 
-        plt.suptitle(f"Throughput for different dataset sizes ({strategy}, {query_type})")
+        plt.suptitle(f"Throughput for different dataset sizes ({strategy}, {QT_LABELS[query_type].lower()})")
 
         save_plot(f"throughput-dataset-size-{strategy}")
 
