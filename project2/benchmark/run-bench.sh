@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sizes=(1 2 4 8 16 32)
+sizes=(1 2 4 8)
 count=`expr ${#sizes[@]} - 1`
 elastic_port=9200
 psql_port=5049
@@ -17,7 +17,9 @@ do :
     export COSYP_ELASTIC_URL="http://localhost:${eport}"
     export DATASET_SIZE_GB="$size"
 
-    docker compose -f ../docker-compose.yaml start "psql-${size}g elasic-${size}g"
+    docker compose start "psql-${size}g"
+    docker compose start "elastic-${size}g"
     python3 benchmark.py
-    docker compose -f ../docker-compose.yaml stop "psql-${size}g elasic-${size}g"
+    docker compose stop "psql-${size}g"
+    docker compose stop "elastic-${size}g"
 done
