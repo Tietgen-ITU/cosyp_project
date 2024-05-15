@@ -6,6 +6,7 @@ import sys
 import json
 import matplotlib as mpl
 from numpy import average
+import numpy as np
 
 mpl.rcParams['figure.dpi'] = 600
 
@@ -15,6 +16,17 @@ runners = ["postgres", "elasticsearch"]
 query_types = ["in_many_articles", "in_few_articles", "random", "no_matches"]
 dataset_sizes = ["1", "2", "4", "8", "16", "32"]
 
+QT_LABELS = {
+    "in_many_articles": "Queries with many hits",
+    "in_few_articles": "Queries with few hits",
+    "random": "Random queries",
+    "no_matches": "Queries with 0 hits"
+}
+
+RUNNER_LABELS = {
+    "postgres": "Postgres",
+    "elasticsearch": "Elasticsearch"
+}
 
 @dataclass
 class Configuration:
@@ -240,47 +252,60 @@ def plot_resource_usage(configurations: list[Configuration]):
 def plot_latencies(configurations: list[Configuration]):
     configurations.sort(key=lambda x: x.config()["num_words"])
 
-    for qt in query_types:
-        charts = [
-            {
-                "title": "Average",
-                "key": "avg_latency",
-            },
-            {
-                "title": "99% percentile",
-                "key": "percentile_99",
-            },
-            {
-                "title": "1% percentile",
-                "key": "percentile_1",
-            },
-        ]
+    charts = [
+        {
+            "title": "Average",
+            "key": "avg_latency",
+        },
+        {
+            "title": "99% percentile",
+            "key": "percentile_99",
+        },
+        {
+            "title": "1% percentile",
+            "key": "percentile_1",
+        },
+    ]
 
-        for chart in charts:
-            width = 0.33
+    for chart in charts:
+        width = 0.9
 
-            plt.figure(figsize=(13, 5))
+        plt.figure(figsize=(13, 5))
 
-            for i, runner in enumerate(runners):
-                ax = plt.gca()
+        max_y = 0
+        for i, runner in enumerate(runners):
+            ax = plt.subplot(1, len(runners), i + 1)
 
+            stack_ys = np.zeros(8)
+
+            for j, qt in enumerate(query_types):
                 confs = [c for c in configurations if c.config(
                 )["strategy"] == "single" and c.config()["query_type"] == qt]
 
                 bar_positions = list(range(len(confs)))
-                xs = [x - width / 2 + width * i for x in bar_positions]
-                ys = [getattr(c.metrics(runner), chart["key"]) for c in confs]
+                xs = [x for x in bar_positions]
+                ys = np.array([getattr(c.metrics(runner), chart["key"]) for c in confs])
 
-                rects = ax.bar(xs, ys, width=width, label=runner)
-                ax.bar_label(rects, padding=3, labels=[f"{y:.1f}ms" for y in ys])
+                rects = ax.bar(xs, ys, bottom=stack_ys, width=width, label=QT_LABELS[qt], zorder=3)
+                stack_ys += ys
+                max_y = max(max_y, max(stack_ys))
+
+                # ax.bar_label(rects, padding=3, labels=[f"{y:.1f}ms" for y in ys])
                 ax.set_xticks(bar_positions, [c.config()["num_words"][0] for c in confs])
 
+            ax.grid(zorder=0)
+
+        for i, runner in enumerate(runners):
+            plt.subplot(1, len(runners), i + 1)
+            plt.ylim(0, max_y * 1.05)
             plt.xlabel("Number of words in search term")
             plt.ylabel("Latency (ms)")
-            plt.title(f"{chart['title']} latency for different query sizes ({qt})")
+            plt.title(RUNNER_LABELS[runner])
             plt.legend()
 
-            save_plot(f"latency-{chart['key']}-{qt}")
+        plt.suptitle(f"{chart['title']} latency for different query sizes")
+
+        save_plot(f"latency-{chart['key']}")
 
 
 def plot_throughput_per_dataset_size(configurations: list[Configuration]):
@@ -317,7 +342,7 @@ def plot_throughput_per_dataset_size(configurations: list[Configuration]):
             plt.xlabel("Number of words in search term")
             plt.ylabel("Throughput (queries/second)")
             plt.grid()
-            plt.title(runner)
+            plt.title(RUNNER_LABELS[runner])
             plt.legend()
 
         for i, _ in enumerate(runners):
@@ -336,21 +361,23 @@ if __name__ == "__main__":
 
     configurations = read_data(sys.argv[1])
 
+    configurations = [c for c in configurations if c.config()["repetition"] == 2]
+
     for c in configurations:
         print(c.config())
 
     one_size_confs = [c for c in configurations if c.config()["dataset_size_gb"] == "1"]
 
-    print("Plotting throughput...")
-    plot_throughput(one_size_confs)
-    print("Plotting throughput per query type...")
-    plot_throughput_per_query_type(one_size_confs)
-    print("Plotting variance...")
-    plot_variance(one_size_confs)
-    print("Plotting resource usage...")
-    plot_resource_usage(one_size_confs)
+    # print("Plotting throughput...")
+    # plot_throughput(one_size_confs)
+    # print("Plotting throughput per query type...")
+    # plot_throughput_per_query_type(one_size_confs)
+    # print("Plotting variance...")
+    # plot_variance(one_size_confs)
+    # print("Plotting resource usage...")
+    # plot_resource_usage(one_size_confs)
     print("Plotting latencies...")
     plot_latencies(one_size_confs)
-    print("Plotting throughput per dataset size...")
-    plot_throughput_per_dataset_size(configurations)
+    # print("Plotting throughput per dataset size...")
+    # plot_throughput_per_dataset_size(configurations)
     print("Done")
