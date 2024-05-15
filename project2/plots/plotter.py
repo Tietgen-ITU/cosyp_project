@@ -7,6 +7,8 @@ import json
 import matplotlib as mpl
 from numpy import average
 import numpy as np
+import copy
+import hashlib
 
 mpl.rcParams['figure.dpi'] = 600
 
@@ -91,6 +93,8 @@ def read_data(folder):
 
 
 def plot_throughput(configurations: list[Configuration]):
+    configurations = [g["combined"] for g in group_by_repetition(configurations)]
+    configurations = [c for c in configurations if c.config()["dataset_size_gb"] == "1"]
     configurations.sort(key=lambda x: x.config()["num_words"])
 
     for strategy in strategies:
@@ -123,6 +127,8 @@ def plot_throughput(configurations: list[Configuration]):
 
 
 def plot_throughput_per_query_type(configurations: list[Configuration]):
+    configurations = [g["combined"] for g in group_by_repetition(configurations)]
+    configurations = [c for c in configurations if c.config()["dataset_size_gb"] == "1"]
     configurations.sort(key=lambda x: x.config()["num_words"])
 
     for strategy in strategies:
@@ -166,6 +172,8 @@ def plot_throughput_per_query_type(configurations: list[Configuration]):
 
 
 def plot_variance(configurations: list[Configuration]):
+    configurations = [g["combined"] for g in group_by_repetition(configurations)]
+    configurations = [c for c in configurations if c.config()["dataset_size_gb"] == "1"]
     configurations.sort(key=lambda x: x.config()["num_words"])
 
     for strategy in strategies:
@@ -195,11 +203,13 @@ def plot_variance(configurations: list[Configuration]):
 
 
 def plot_resource_usage(configurations: list[Configuration]):
+    configurations = [g["combined"] for g in group_by_repetition(configurations)]
+    configurations = [c for c in configurations if c.config()["dataset_size_gb"] == "1"]
     configurations.sort(key=lambda x: x.config()["num_words"])
 
     for qt in query_types:
         plt.figure(figsize=(13, 5))
-        max_perc = 0
+        max_perc = 400 # 0
         for i, runner in enumerate(runners):
             for j, strategy in enumerate(strategies):
                 plt.subplot(1, len(runners), i + 1)
@@ -221,9 +231,9 @@ def plot_resource_usage(configurations: list[Configuration]):
                     y = average(percs)
                     ys.append(y)
 
-                    max_percs = [stat["cpu_max_perc"]
-                                 for stat in c.resource_usage(runner)]
-                    max_perc = max(max_perc, max(max_percs))
+                    # max_percs = [stat["cpu_max_perc"]
+                    #              for stat in c.resource_usage(runner)]
+                    # max_perc = max(max_perc, max(max_percs))
 
                 plt.plot(xs, ys, f'-{marker}',
                          markerfacecolor=facecolor, label=f"{strategy}")
@@ -250,6 +260,8 @@ def plot_resource_usage(configurations: list[Configuration]):
 
 
 def plot_latencies(configurations: list[Configuration]):
+    configurations = [g["combined"] for g in group_by_repetition(configurations)]
+    configurations = [c for c in configurations if c.config()["dataset_size_gb"] == "1" and c.config()["strategy"] == "single"]
     configurations.sort(key=lambda x: x.config()["num_words"])
 
     charts = [
@@ -279,8 +291,7 @@ def plot_latencies(configurations: list[Configuration]):
             stack_ys = np.zeros(8)
 
             for j, qt in enumerate(query_types):
-                confs = [c for c in configurations if c.config(
-                )["strategy"] == "single" and c.config()["query_type"] == qt]
+                confs = [c for c in configurations if c.config()["query_type"] == qt]
 
                 bar_positions = list(range(len(confs)))
                 xs = [x for x in bar_positions]
@@ -309,6 +320,7 @@ def plot_latencies(configurations: list[Configuration]):
 
 
 def plot_throughput_per_dataset_size(configurations: list[Configuration]):
+    configurations = [g["combined"] for g in group_by_repetition(configurations)]
     configurations.sort(key=lambda x: x.config()["num_words"])
     query_type = "random"
 
@@ -354,6 +366,34 @@ def plot_throughput_per_dataset_size(configurations: list[Configuration]):
         save_plot(f"throughput-dataset-size-{strategy}")
 
 
+def group_by_repetition(configurations: list[Configuration]):
+    groups = {}
+
+    for c in configurations:
+        cc = copy.deepcopy(c.config())
+        cc.pop("repetition")
+        cc.pop("seed")
+        hashable = json.dumps(sorted((k, str(v)) for k,v in cc.items()))
+        configuration_hash = hashlib.md5(hashable.encode()).hexdigest()
+
+        if configuration_hash not in groups:
+            groups[configuration_hash] = {
+                "combined": Configuration(copy.deepcopy(c.data)),
+                "sources": [c]
+            }
+            groups[configuration_hash]["combined"].data["configuration"] = cc
+        else:
+            write_to = groups[configuration_hash]["combined"].data
+            groups[configuration_hash]["sources"].append(c)
+
+            for runner, val in c.data["runners"].items():
+                write_to["runners"][runner]["queries"].extend(val["queries"])
+                write_to["runners"][runner]["total_elapsed_ms"] += val["total_elapsed_ms"]
+                write_to["runners"][runner]["stats"].extend(val["stats"])
+
+    return groups.values()
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python plotter.py <dir path>")
@@ -361,23 +401,19 @@ if __name__ == "__main__":
 
     configurations = read_data(sys.argv[1])
 
-    configurations = [c for c in configurations if c.config()["repetition"] == 2]
-
     for c in configurations:
         print(c.config())
 
-    one_size_confs = [c for c in configurations if c.config()["dataset_size_gb"] == "1"]
-
-    # print("Plotting throughput...")
-    # plot_throughput(one_size_confs)
-    # print("Plotting throughput per query type...")
-    # plot_throughput_per_query_type(one_size_confs)
-    # print("Plotting variance...")
-    # plot_variance(one_size_confs)
-    # print("Plotting resource usage...")
-    # plot_resource_usage(one_size_confs)
+    print("Plotting throughput...")
+    plot_throughput(configurations)
+    print("Plotting throughput per query type...")
+    plot_throughput_per_query_type(configurations)
+    print("Plotting variance...")
+    plot_variance(configurations)
+    print("Plotting resource usage...")
+    plot_resource_usage(configurations)
     print("Plotting latencies...")
-    plot_latencies(one_size_confs)
-    # print("Plotting throughput per dataset size...")
-    # plot_throughput_per_dataset_size(configurations)
+    plot_latencies(configurations)
+    print("Plotting throughput per dataset size...")
+    plot_throughput_per_dataset_size(configurations)
     print("Done")
