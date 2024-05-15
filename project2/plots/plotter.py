@@ -125,7 +125,7 @@ def plot_throughput(configurations: list[Configuration]):
             plt.ylabel("Throughput (queries/second)")
             plt.grid()
             plt.title(
-                f"Throughput for different query sizes ({strategy}, {QT_LABELS[qt].lower()})")
+                f"Throughput for different query sizes ({STRATEGY_LABELS[strategy].lower()}, {QT_LABELS[qt].lower()})")
             plt.legend()
 
             save_plot(f"throughput-{strategy}-{qt}")
@@ -171,7 +171,7 @@ def plot_throughput_per_query_type(configurations: list[Configuration]):
             plt.subplot(1, len(runners), i + 1)
             plt.ylim(0, max_y * 1.1)
 
-        plt.suptitle(f"Throughput for different query types ({strategy})")
+        plt.suptitle(f"Throughput for different query types ({STRATEGY_LABELS[strategy].lower()})")
 
         save_plot(f"throughput-query-cardinality-{strategy}")
 
@@ -200,7 +200,7 @@ def plot_throughput_per_strategy(configurations: list[Configuration]):
                 max_y = max(max_y, max(ys))
 
                 plt.plot(xs, ys, f'-{marker}',
-                         markerfacecolor=facecolor, label=f"{STRATEGY_LABELS[strategy]}")
+                         markerfacecolor=facecolor, label=f"{STRATEGY_LABELS[strategy].lower()}")
 
             ax = plt.gca()
             ax.set_xscale('log', base=2)
@@ -246,7 +246,7 @@ def plot_variance(configurations: list[Configuration]):
 
                 plt.boxplot(ys, labels=xs, showmeans=True)
 
-                plt.title(f"Latencies for {runner} ({strategy}, {qt})")
+                plt.title(f"Latencies for {runner} ({STRATEGY_LABELS[strategy].lower()}, {QT_LABELS[qt].lower()})")
                 plt.xlabel("Number of words in query")
                 plt.ylabel("Latency (ms)")
                 plt.grid()
@@ -288,7 +288,7 @@ def plot_resource_usage(configurations: list[Configuration]):
                     # max_perc = max(max_perc, max(max_percs))
 
                 plt.plot(xs, ys, f'-{marker}',
-                         markerfacecolor=facecolor, label=f"{strategy}")
+                         markerfacecolor=facecolor, label=f"{STRATEGY_LABELS[strategy]}")
 
                 ax = plt.gca()
                 ax.set_xscale('log', base=2)
@@ -302,7 +302,7 @@ def plot_resource_usage(configurations: list[Configuration]):
         for i, _ in enumerate(runners):
             plt.subplot(1, len(runners), i + 1)
             plt.axhline(y=max_perc, color='r', linestyle='--',
-                        label='maximum possible cpu usage')
+                        label='Maximum possible cpu usage')
             plt.ylim(0, max_perc * 1.1)
             plt.legend()
 
@@ -409,7 +409,7 @@ def plot_throughput_per_dataset_size(configurations: list[Configuration]):
             plt.subplot(1, len(runners), i + 1)
             plt.ylim(0, max_y * 1.1)
 
-        plt.suptitle(f"Throughput for different dataset sizes ({strategy}, {QT_LABELS[query_type].lower()})")
+        plt.suptitle(f"Throughput for different dataset sizes ({STRATEGY_LABELS[strategy].lower()}, {QT_LABELS[query_type].lower()})")
 
         save_plot(f"throughput-dataset-size-{strategy}")
 
