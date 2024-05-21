@@ -1,0 +1,165 @@
+version: '3.5'
+
+services:
+
+  psql-1g:
+    container_name: psql-1g
+    image: arne4545/cosyp-psql:latest
+    ports:
+      - '127.0.0.1:5049:5432'
+    volumes:
+      - /home/Group101/data/psql/1gg:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
+
+  psql-2g:
+    container_name: psql-2g
+    image: arne4545/cosyp-psql:latest
+    ports:
+      - '127.0.0.1:5050:5432'
+    volumes:
+      - /home/Group101/data/psql/2g:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
+
+  psql-4g:
+    container_name: psql-4g
+    image: arne4545/cosyp-psql:latest
+    ports:
+      - '127.0.0.1:5051:5432'
+    volumes:
+      - /home/Group101/data/psql/4g:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
+
+  psql-8g:
+    container_name: psql-8g
+    image: arne4545/cosyp-psql:latest
+    ports:
+      - '127.0.0.1:5052:5432'
+    volumes:
+      - /home/Group101/data/psql/8g:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
+
+  psql-16g:
+    container_name: psql-16g
+    image: arne4545/cosyp-psql:latest
+    ports:
+      - '127.0.0.1:5053:5432'
+    volumes:
+      - /home/Group101/data/psql/16g:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
+
+  psql-32g:
+    container_name: psql-32g
+    image: arne4545/cosyp-psql:latest
+    ports:
+      - '127.0.0.1:5054:5432'
+    volumes:
+      - /home/Group101/data/psql/32g:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
+
+  elastic-1g:
+    container_name: elastic-1g
+    image: arne4545/cosyp-elastic:latest
+    ports:
+      - '127.0.0.1:9200:9200'
+      - '127.0.0.1:9300:9300'
+    volumes:
+      - /home/Group101/data/elastic/1g:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
+
+  elastic-2g:
+    container_name: elastic-2g
+    image: arne4545/cosyp-elastic:latest
+    ports:
+      - '127.0.0.1:9201:9200'
+      - '127.0.0.1:9301:9300'
+    volumes:
+      - /home/Group101/data/elastic/2g:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
+
+  elastic-4g:
+    container_name: elastic-4g
+    image: arne4545/cosyp-elastic:latest
+    ports:
+      - '127.0.0.1:9202:9200'
+      - '127.0.0.1:9302:9300'
+    volumes:
+      - /home/Group101/data/elastic/4g:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
+
+  elastic-8g:
+    container_name: elastic-8g
+    image: arne4545/cosyp-elastic:latest
+    ports:
+      - '127.0.0.1:9203:9200'
+      - '127.0.0.1:9303:9300'
+    volumes:
+      - /home/Group101/data/elastic/8g:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
+
+  elastic-16g:
+    container_name: elastic-16g
+    image: arne4545/cosyp-elastic:latest
+    ports:
+      - '127.0.0.1:9204:9200'
+      - '127.0.0.1:9304:9300'
+    volumes:
+      - /home/Group101/data/elastic/16g:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
+
+  elastic-32g:
+    container_name: elastic-32g
+    image: arne4545/cosyp-elastic:latest
+    ports:
+      - '127.0.0.1:9205:9200'
+      - '127.0.0.1:9305:9300'
+    volumes:
+      - /home/Group101/data/elastic/32g:/usr/share/elasticsearch/data
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 12g
